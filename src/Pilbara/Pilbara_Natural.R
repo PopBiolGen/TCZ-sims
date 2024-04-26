@@ -1,18 +1,13 @@
-args=(commandArgs(TRUE))
+# This script runs the model over only the natural waterpoints in the TCZ region.
 
-#evaluate the arguments
-# input arguments will be File.ID
+File.ID <- "test"
 
-for(i in 1:length(args)) {
-   eval(parse(text=args[[i]]))
-}
+source("src/ABC/pprocess_functions.R")
+load(file="dat/low density points.RData")
+load("dat/Kernel_fits.RData")
+plb<-read.csv("dat/art_nat_clp.csv")
+load("dat/Posteriors.RData")
 
-setwd("~/final_natural_water_files/Pilbara")
-source("~/evo-dispersal/art_wbdies/VRD/pprocess_functions.R")
-
-load("../Posteriors.RData")
-
-plb<-read.csv("../art_nat_clp.csv")
 #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
 #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
 pairs_pdist<-pdist.fast(X=plb$POINT_X,Y=plb$POINT_Y,maximum=500000,space.size= 500000)
@@ -39,7 +34,7 @@ u<-(plb$rain_1mm-1)/364
 u<-3*(u-u^2) + u^3
 u<-plb$rain_1mm+3*plb$rain_1mm*(1-u)
 u<-floor(u)
-load("../Kernel_fits.RData")
+load("dat/Kernel_fits.RData")
 
 u<-fits[u,1:2]
 
@@ -57,15 +52,16 @@ n.nat.pairs<-do.call("c",lapply(nat.pairs,nrow))
 nat.table[,"n.pairs"]<-n.nat.pairs
 target<-which(nat.table[,"Pres"]==2)
 nat.table[target,"Pres"]<-0
-if (File.ID==1) save(nat.table, file="Natural waterbodies table.RData")
+if (File.ID==1) save(nat.table, file="out/Natural waterbodies table.RData")
 times<-c()
 points.colonised<-c()
 for (ii in 1:10){
+  cat("Rep ", ii, "\n")
   lambda.samp<-10^rnorm(1, mean=sample.lambda, sd=sample.lambda.sd)
   r.samp<-10^2
   temp<-spread.pilb(pop=nat.table, gens=100, pairs=nat.pairs, target=target, delta=lambda.samp, r=r.samp)
   times<-c(times, temp[[1]])
   points.colonised<-rbind(points.colonised, cbind(repl=rep(ii, nrow(temp[[2]])), temp[[2]]))
 }
-save(times, points.colonised, file=paste("times colonised natural only", File.ID, ".RData", sep=""))
+save(times, points.colonised, file=paste("out/times-colonised-natural-only", File.ID, ".RData", sep=""))
 ################################################

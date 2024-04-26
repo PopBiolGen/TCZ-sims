@@ -1,7 +1,7 @@
 File.ID <- "test"
 
 
-#set the working directory
+
 
 source("src/ABC/pprocess_functions.R")
 load(file="dat/low density points.RData")

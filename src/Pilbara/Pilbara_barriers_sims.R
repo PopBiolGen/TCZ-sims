@@ -1,21 +1,13 @@
-#HPC script
-args=(commandArgs(TRUE))
-
-#evaluate the arguments
-# input arguments will be File.ID
-
-for(i in 1:length(args)) {
-   eval(parse(text=args[[i]]))
-}
+File.ID <- "test"
 
 
 #set the working directory
-setwd("~/final_natural_water_files/Pilbara")
-source("~/evo-dispersal/art_wbdies/VRD/pprocess_functions.R")
-load(file="../low density points.RData")
-load("../Kernel_fits.RData")
-plb<-read.csv("../art_nat_clp.csv")
-load("../Posteriors.RData")
+
+source("src/ABC/pprocess_functions.R")
+load(file="dat/low density points.RData")
+load("dat/Kernel_fits.RData")
+plb<-read.csv("dat/art_nat_clp.csv")
+load("dat/Posteriors.RData")
 
 #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
 #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
@@ -70,7 +62,7 @@ for (kk in 1:length(nn)){ # for each number of NNs
     }
   }
 }
-save(output, file=paste("nn", File.ID, ".RData", sep=""))
+save(output, file=paste("out/nn", File.ID, ".RData", sep=""))
 
 
 

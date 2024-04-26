@@ -1,9 +1,11 @@
-setwd("~/final_natural_water_files/Pilbara")
-source("~/evo-dispersal/art_wbdies/VRD/pprocess_functions.R")
+# This script runs the model and makes demo figures (without a base map)
 
-load("../Posteriors.RData")
-load(file="~/final_natural_water_files/low density points.RData")
-plb<-read.csv("../art_nat_clp.csv")
+source("src/ABC/pprocess_functions.R")
+
+load("dat/Posteriors.RData")
+load(file="dat/low density points.RData")
+plb<-read.csv("dat/art_nat_clp.csv")
+
 #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
 #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
 pairs_pdist<-pdist.fast(X=plb$POINT_X,Y=plb$POINT_Y,maximum=500000,space.size= 500000)
@@ -32,30 +34,31 @@ u<-(plb$rain_1mm-1)/364
 u<-3*(u-u^2) + u^3
 u<-plb$rain_1mm+3*plb$rain_1mm*(1-u)
 u<-floor(u)
-load("../Kernel_fits.RData")
+load("dat/Kernel_fits.RData")
 
 u<-fits[u,1:2]
 
 spread.table<-as.matrix(cbind(ID,X,Y,Pres,n.pairs,u,age),
 nrow=length(age),ncol=7)
 
-setwd("~/final_natural_water_files/Pilbara/Demo figures/No Barriers")
-plotter(spread.table, file.name="0.png", gen=0)
+plotter(spread.table, file.name="out/0.png", gen=0)
 #################################################
-
+setwd("out")
   lambda.samp<-10^sample.lambda
   r.samp<-10^2
   temp<-spread.pilb(pop=spread.table, gens=100, pairs=pairs_pdist, target=target, delta=lambda.samp, r=r.samp, plot=TRUE)
   
-temp$popmatrix[,"Pres"]<-1
-plotter(temp$popmatrix, file.name=paste(temp$gen+1, ".png", sep=""), gen=temp$gen+1)
+  temp$popmatrix[,"Pres"]<-1
+  plotter(temp$popmatrix, file.name=paste(temp$gen+1, ".png", sep=""), gen=temp$gen+1)
+
 ################################################
 
 for(ii in 1:nrow(ld.points)){ # for each point
-	setwd(paste("~/final_natural_water_files/Pilbara/Demo figures", "//Barr", ii, sep=""))
   	mod<-knock.out.nn.xy(X=ld.points[ii,"x"], Y=ld.points[ii,"y"], spread.table=spread.table, n=100, natural=nats)
   	target<-which(mod$spread.table[,"Pres"]==2)
-	mod$spread.table[mod$spread.table[,"Pres"]==2,"Pres"]<-0
-	plotter(mod$spread.table, file.name="0.png", gen=0)
+	  mod$spread.table[mod$spread.table[,"Pres"]==2,"Pres"]<-0
+	  plotter(mod$spread.table, file.name="0.png", gen=0)
   	temp<-spread.pilb(pop=mod$spread.table, gens=100, pairs=mod$pairs.mod, target=target, delta=lambda.samp, r=r.samp, plot=TRUE)
 }
+  
+setwd("..")

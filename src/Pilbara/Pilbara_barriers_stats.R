@@ -1,12 +1,11 @@
-#Local script
+# This script generates the data for the map of the barrier in Tingley et al.
+# It also makes a basic figure of those data
 
-#set the working directory
-setwd("~/Dropbox/Papers/Submitted/Artificial waterbodies/Figures/Data")
-source("~/evo-dispersal/art_wbdies/VRD/pprocess_functions.R")
-load(file="low density points.RData")
-load("Kernel_fits.RData")
-plb<-read.csv("art_nat_clp.csv")
-load("Posteriors.RData")
+source("src/ABC/pprocess_functions.R")
+load(file="dat/low density points.RData")
+load("dat/Kernel_fits.RData")
+plb<-read.csv("dat/art_nat_clp.csv")
+load("dat/Posteriors.RData")
 
 #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
 #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
@@ -56,7 +55,7 @@ nat.points<-cbind(spread.table[nats,], matrix(0, nrow=length(nats), ncol=3))
 
 out.table<-rbind(art.points, nat.points)
 
-pdf(file="../Barriersmap.pdf")
+pdf(file="out/Barriersmap.pdf")
 cls<-c("black", "grey40")
 barr<-10
   for(ii in 1:nrow(ld.points)){
@@ -67,6 +66,4 @@ barr<-10
   }
 dev.off()
 
-save(out.table, file="Data for Barriers map.RData")
-
-
+save(out.table, file="out/Data-for-barriers-map.RData")

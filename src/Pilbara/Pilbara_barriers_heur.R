@@ -1,13 +1,11 @@
 #local script
 
-#set the working directory
-setwd("~/Dropbox/Papers/Submitted/Artificial waterbodies/Pilbara")
-source("~/evo-dispersal/art_wbdies/VRD/pprocess_functions.R")
+source("src/ABC/pprocess_functions.R")
 
 
 alpha<-2.113e+10 #best fit value of K from VRD analysis
 alpha.sd<-4016222910
-plb<-read.csv("art_nat_clp.csv")
+plb<-read.csv("dat/art_nat_clp.csv")
 #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
 #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
 pairs_pdist<-pdist.fast(X=plb$POINT_X,Y=plb$POINT_Y,maximum=100000,space.size= 500000)
@@ -36,7 +34,7 @@ u<-(plb$rain_1mm-1)/364
 u<-3*(u-u^2) + u^3
 u<-plb$rain_1mm+3*plb$rain_1mm*(1-u)
 u<-floor(u)
-load("Kernel_fits.RData")
+load("dat/Kernel_fits.RData")
 
 u<-fits[u,1:2]
 
@@ -47,7 +45,7 @@ nrow=length(age),ncol=7)
 ###############################################################
 ## Heuristic - density plot.
 # put a smoother through, calculate densities and make plots
-png("../Figures/Heuristic.png", width=14, height=24, units="cm", res=300)
+png("out/heuristic.png", width=14, height=24, units="cm", res=300)
 par(mfrow=c(2,1))
 sm<-lowess(spread.table[,"X"], spread.table[,"Y"], f=0.2)
 bw.adj<-0.2
@@ -78,11 +76,11 @@ dev.off()
 out.data<-cbind(X=spread.table[arts,"X"], Y=spread.table[arts,"Y"], Category=rep("Artificial", length(arts)))
 out.data<-rbind(out.data, cbind(spread.table[nats,"X"], spread.table[nats,"Y"], Category=rep("Natural", length(nats))))
 out.data<-rbind(out.data, cbind(sm$x[c(root1, root2, root3)], sm$y[c(root1, root2, root3)], c("Eastern", "Central", "Western")))
-save(out.data, file="../Figures/HeurB.RData")
+save(out.data, file="out/HeurB.RData")
 
 ##############################################################
 ld.points<-cbind(x=sm$x[c(root1, root2, root3)], y=sm$y[c(root1, root2, root3)])
-save(ld.points, file="low density points.RData")
+save(ld.points, file="out/low density points.RData")
 ###################################################
 # Does removing n NNs around the points stop toads?
 nn<-seq(50, 75, 5)
@@ -94,12 +92,17 @@ for (kk in 1:length(nn)){
     for(ii in 1:nrow(ld.points)){
       PseudoK<-rnorm(1, mean=21753929728, sd=0.5*9669058589)
       mod<-knock.out.nn.xy(X=ld.points[ii,"x"], Y=ld.points[ii,"y"], spread.table=spread.table, n=nn[kk], natural=nats)
-      temp<-spread.pilb(mod$spread.table,200,mod$pairs.mod,PseudoK,target)
+      temp<-spread.pilb(pop = mod$spread.table,
+                        gens = 200,
+                        pairs = mod$pairs.mod,
+                        target = target,
+                        delta = 600,
+                        r = 2000)
       rep<-c(rep, temp[[1]])
     }
     results<-rbind(results, rep)
   }
-  save(ld.points, results, file=paste("nn", nn[kk], ".RData", sep=""))
+  save(ld.points, results, file=paste("out/nn", nn[kk], ".RData", sep=""))
 }
 
 summ<-c()

@@ -217,10 +217,9 @@ for (i in 1:gens){
 
 # Sets up the spread table and pulls parameters ready for simulations
   # returns the spread table
-setup <- function() {
-  source("src/pprocess_functions.R")
+setup <- function(point.data = "dat/art_nat_clp.csv") {
   load("dat/Kernel_fits.RData")
-  plb<-read.csv("dat/art_nat_clp.csv")
+  plb<-read.csv(point.data)
   load("dat/Posteriors.RData")
   
   #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5

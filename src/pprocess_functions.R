@@ -1,6 +1,53 @@
+#calculates density of X2, Y2 along line given by X1, Y1   
+density.line<-function(X1, Y1, X2, Y2, bw=bw.nrd(sqrt((X1[1]-X2)^2+(Y1[1]-Y2)^2)), adjust=1){
+  pdists<-vector(mode="list", length=length(X1))
+  pdens<-vector(mode="numeric", length=length(X1))
+  for (ii in 1:length(X1)){ 
+    pdists[[ii]]<-sqrt((X2-X1[ii])^2+(Y2-Y1[ii])^2)
+    pdens[ii]<-sum(dnorm(x=pdists[[ii]], mean=0, sd=bw*adjust))#/length(X2)
+  }
+  list(x=X1, y=pdens)
+}
+
+#The kernel
+dcncross<-function(x, u, v) {  #stuart's cauchy-normal distribution in 2D
+  (x*u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi*x)
+} 
+
 #takes x, y, indices of a matrix and places them into a vector
 flatmat<-function(x, y, size){ #size is size of one side of matrix
 	(y-1)*size+x
+}
+
+# given a point in the pdist list, takes out that point and its n nearest neighbours from the
+#   pairwise distance list.  Returns modified list.
+knock.out.nn<-function(pdist.list, point, n.n.neighb, natural){
+  if (length(point)>1) warning("Multiple point removal not allowed")
+  temp<-pdist.list[[point]] # get ID of points to knock out
+  temp<-temp[order(temp[,'dists'])[1:(n.n.neighb+1)],"snk.ID"]
+  temp<-temp[!temp%in%natural] #can't knock out natural points
+  lapply(pdist.list, function(x) {subset(x, !x[,1]%in%temp)}) # and remove them from everywhere in the list
+}
+
+# given a point not in the spread table, takes out that point's n nearest (artificial) neighbours from the
+#   spread table.  Returns modified spread.table and pdist.list.
+knock.out.nn.xy<-function(X, Y, spread.table, n, natural){
+  if (length(X)>1 | length(Y)>1) {warning("Multiple point removal not allowed"); return(NULL)}
+  pdists<-sqrt((spread.table[,"X"]-X)^2+(spread.table[,"Y"]-Y)^2)
+  top<-order(pdists)[!order(pdists)%in%natural]
+  spread.table<-spread.table[-top[1:n],]
+  pairs.mod<-pdist.fast(spread.table[,"X"], spread.table[,"Y"], maximum=500000, space.size=500000)
+  spread.table[, "n.pairs"]<-do.call("c",lapply(pairs.mod,nrow))
+  spread.table[, "ID"]<-1:nrow(spread.table)
+  list(spread.table=spread.table, pairs.mod=pairs.mod)
+}
+
+# given a point, takes out that point and its n sized shortest path from the
+#   pairwise distance list.  Returns modified list.
+knock.out.path<-function(pdist.list, point, n.points=2, natural){
+  temp<-pathway(pdist.list, point, n.points=2, natural)
+  if (is.null(temp)) return(NULL)
+  lapply(pdist.list, function(x) {subset(x, !x[,1]%in%temp)}) # and remove them from everywhere in the list
 }
 
 
@@ -30,7 +77,66 @@ neighbours.init<-function(space.size, cell.size){
 	neigh	#return the array
 }
 
+# Approximate correction for pi*r2 calculation by the proportional overlap between waterbodies that are less than 2r distant from one another
+neigh.corr<-function(pairs, r){
+  #collect pairs less than 2r distant
+  corrn<-function(x){
+    temp<-matrix(x[x[,"dists"]<=2*r & x[,"dists"]>0,], ncol=2)
+    if (length(temp)==0) return(1)
+    theta<-2*acos(temp[,2]/(2*r))
+    out<-1-(theta-sin(theta))/(2*pi)
+    out<-prod(out)
+    out
+  }
+  unlist(lapply(pairs, corrn))
+}
 
+obs_pred_cf<-function(preds, obs){
+  preds[,5]<-preds[,5]+2007
+  preds<-as.data.frame(preds)
+  temp<-merge(preds, obs, by.x=c(2, 3, 5), by.y=c(9, 10, 15))
+  #browser()
+  temp<-temp[,"Pres"]==temp[,"OCCUPIED"]
+  temp<-na.exclude(temp)
+  sum(temp)
+}
+
+
+# outputs data.  With or without a plot as well.
+output<-function(pop, gen, id, plot=T){
+  dname<-paste(id, "pop", gen, ".txt", sep="")
+  write.table(pop, dname, sep="\t", row.names=F)
+  if (plot==T){
+    pname<-paste(id, "plot", gen, ".png", sep="")
+    plotter(pop, pname)
+  }	
+}
+
+output_val<-function(pop, gens){
+  pop<-pop[,1:4]
+  pop<-cbind(pop,rep(gens, nrow(pop)))
+  colnames(pop)[5]<-"Generation"	
+  pop
+}
+
+# given a point, identifies n points making the shortest overall pathway between points
+pathway<-function(pdist.list, point, n.points=2, natural){
+  if (length(point)>1) {warning("Multiple point specification not allowed"); return(NULL)}
+  IDs<-point
+  temp<-pdist.list[[point]] # get first matrix
+  for (ii in 1:(n.points-1)){
+    temp<-temp[!temp[,"snk.ID"]%in%IDs,] #remove rows already identified in IDs
+    next.id<-temp[which(temp[,"dists"]==min(temp[,"dists"]))[1], "snk.ID"]
+    temp<-rbind(temp, pdist.list[[next.id]])
+    IDs<-c(IDs, next.id)
+  }
+  if (sum(IDs%in%natural)>0) return(NULL)
+  IDs
+}
+
+
+
+# Fast calculation of pairwise distances
 pdist.fast<-function(X, Y, maximum, space.size){
 	X<-X-min(X) # start coordinates at zero
 	Y<-Y-min(Y)
@@ -61,22 +167,15 @@ pdist.fast<-function(X, Y, maximum, space.size){
 	out
 }
 
-
-#The kernel
-dcncross<-function(x, u, v) {  #stuart's cauchy-normal distribution in 2D
-	(x*u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi*x)
-} 
-
-# outputs data.  With or without a plot as well.
-output<-function(pop, gen, id, plot=T){
-	dname<-paste(id, "pop", gen, ".txt", sep="")
-	write.table(pop, dname, sep="\t", row.names=F)
-	if (plot==T){
-		pname<-paste(id, "plot", gen, ".png", sep="")
-		plotter(pop, pname)
-	}	
+#plots opportunities and colonised populations
+plotter<-function(popmatrix, file.name="temp.png", gen){
+  png(filename=file.name, width=7, height=7, units="cm", res=150, pointsize=6)
+  plot(popmatrix[,2], popmatrix[,3], xlab="False easting (kms)", ylab="False northing (kms)", pch=19)
+  occp<-subset(popmatrix, popmatrix[,"Pres"]==1)
+  points(occp[,2], occp[,3], pch=19, col="red")
+  legend('topleft', legend=paste("Time =", gen), bty="n", pch=NA, cex=1.5)
+  dev.off()
 }
-
 
 # spreads the population over gen generations, and compares predictions to observed spread
 spread<-function(pop, gens, pairs, delta, r, obs){ #pairs is a list from pdist.fast
@@ -115,41 +214,6 @@ for (i in 1:gens){
 		obs_pred_cf(preds,obs)
 }
 
-# calculates the product of all elements in a vector
-vec.prod<-function(vec){
-  last<-length(vec)
-  cumprod(vec)[last]
-}
-
-#plots opportunities and colonised populations
-plotter<-function(popmatrix, file.name="temp.png", gen){
-	png(filename=file.name, width=7, height=7, units="cm", res=150, pointsize=6)
-	plot(popmatrix[,2], popmatrix[,3], xlab="False easting (kms)", ylab="False northing (kms)", pch=19)
-	occp<-subset(popmatrix, popmatrix[,"Pres"]==1)
-	points(occp[,2], occp[,3], pch=19, col="red")
-	legend('topleft', legend=paste("Time =", gen), bty="n", pch=NA, cex=1.5)
-	dev.off()
-}
-
-
-output_val<-function(pop, gens){
-		pop<-pop[,1:4]
-		pop<-cbind(pop,rep(gens, nrow(pop)))
-		colnames(pop)[5]<-"Generation"	
-		pop
-}
-
-
-
-obs_pred_cf<-function(preds, obs){
-	preds[,5]<-preds[,5]+2007
-	preds<-as.data.frame(preds)
-	temp<-merge(preds, obs, by.x=c(2, 3, 5), by.y=c(9, 10, 15))
-	#browser()
-	temp<-temp[,"Pres"]==temp[,"OCCUPIED"]
-	temp<-na.exclude(temp)
-	sum(temp)
-}
 
 # Sets up the spread table and pulls parameters ready for simulations
   # returns the spread table
@@ -273,73 +337,8 @@ for (i in 1:gens){
 	list(gen=i, popmatrix=pop)	
 }
 
-# given a point in the pdist list, takes out that point and its n nearest neighbours from the
-#   pairwise distance list.  Returns modified list.
-knock.out.nn<-function(pdist.list, point, n.n.neighb, natural){
-  if (length(point)>1) warning("Multiple point removal not allowed")
-  temp<-pdist.list[[point]] # get ID of points to knock out
-  temp<-temp[order(temp[,'dists'])[1:(n.n.neighb+1)],"snk.ID"]
-  temp<-temp[!temp%in%natural] #can't knock out natural points
-  lapply(pdist.list, function(x) {subset(x, !x[,1]%in%temp)}) # and remove them from everywhere in the list
-}
-
-# given a point not in the spread table, takes out that point's n nearest (artificial) neighbours from the
-#   spread table.  Returns modified spread.table and pdist.list.
-knock.out.nn.xy<-function(X, Y, spread.table, n, natural){
-  if (length(X)>1 | length(Y)>1) {warning("Multiple point removal not allowed"); return(NULL)}
-  pdists<-sqrt((spread.table[,"X"]-X)^2+(spread.table[,"Y"]-Y)^2)
-  top<-order(pdists)[!order(pdists)%in%natural]
-  spread.table<-spread.table[-top[1:n],]
-  pairs.mod<-pdist.fast(spread.table[,"X"], spread.table[,"Y"], maximum=500000, space.size=500000)
-  spread.table[, "n.pairs"]<-do.call("c",lapply(pairs.mod,nrow))
-  spread.table[, "ID"]<-1:nrow(spread.table)
-  list(spread.table=spread.table, pairs.mod=pairs.mod)
-}
-
-# given a point, identifies n points making the shortest overall pathway between points
-pathway<-function(pdist.list, point, n.points=2, natural){
-  if (length(point)>1) {warning("Multiple point specification not allowed"); return(NULL)}
-  IDs<-point
-  temp<-pdist.list[[point]] # get first matrix
-  for (ii in 1:(n.points-1)){
-    temp<-temp[!temp[,"snk.ID"]%in%IDs,] #remove rows already identified in IDs
-    next.id<-temp[which(temp[,"dists"]==min(temp[,"dists"]))[1], "snk.ID"]
-    temp<-rbind(temp, pdist.list[[next.id]])
-    IDs<-c(IDs, next.id)
-  }
-  if (sum(IDs%in%natural)>0) return(NULL)
-  IDs
-}
-
-# given a point, takes out that point and its n sized shortest path from the
-#   pairwise distance list.  Returns modified list.
-knock.out.path<-function(pdist.list, point, n.points=2, natural){
-  temp<-pathway(pdist.list, point, n.points=2, natural)
-  if (is.null(temp)) return(NULL)
-  lapply(pdist.list, function(x) {subset(x, !x[,1]%in%temp)}) # and remove them from everywhere in the list
-}
-
-#calculates density of X2, Y2 along line given by X1, Y1   
-density.line<-function(X1, Y1, X2, Y2, bw=bw.nrd(sqrt((X1[1]-X2)^2+(Y1[1]-Y2)^2)), adjust=1){
-  pdists<-vector(mode="list", length=length(X1))
-  pdens<-vector(mode="numeric", length=length(X1))
-  for (ii in 1:length(X1)){ 
-    pdists[[ii]]<-sqrt((X2-X1[ii])^2+(Y2-Y1[ii])^2)
-    pdens[ii]<-sum(dnorm(x=pdists[[ii]], mean=0, sd=bw*adjust))#/length(X2)
-  }
-  list(x=X1, y=pdens)
-}
-
-# Approximate correction for pi*r2 calculation by the proportional overlap between waterbodies that are less than 2r distant from one another
-neigh.corr<-function(pairs, r){
-	#collect pairs less than 2r distant
-	corrn<-function(x){
-		temp<-matrix(x[x[,"dists"]<=2*r & x[,"dists"]>0,], ncol=2)
-		if (length(temp)==0) return(1)
-		theta<-2*acos(temp[,2]/(2*r))
-		out<-1-(theta-sin(theta))/(2*pi)
-		out<-prod(out)
-		out
-	}
-	unlist(lapply(pairs, corrn))
+# calculates the product of all elements in a vector
+vec.prod<-function(vec){
+  last<-length(vec)
+  cumprod(vec)[last]
 }

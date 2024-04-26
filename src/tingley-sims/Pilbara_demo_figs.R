@@ -1,6 +1,6 @@
 # This script runs the model and makes demo figures (without a base map)
 
-source("src/ABC/pprocess_functions.R")
+source("src/pprocess_functions.R")
 
 load("dat/Posteriors.RData")
 load(file="dat/low density points.RData")

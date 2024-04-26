@@ -1,6 +1,6 @@
 #local script
 
-source("src/ABC/pprocess_functions.R")
+source("src/pprocess_functions.R")
 
 
 alpha<-2.113e+10 #best fit value of K from VRD analysis

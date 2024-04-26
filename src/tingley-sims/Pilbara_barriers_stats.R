@@ -1,7 +1,7 @@
 # This script generates the data for the map of the barrier in Tingley et al.
 # It also makes a basic figure of those data
 
-source("src/ABC/pprocess_functions.R")
+source("src/pprocess_functions.R")
 load(file="dat/low density points.RData")
 load("dat/Kernel_fits.RData")
 plb<-read.csv("dat/art_nat_clp.csv")

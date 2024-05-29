@@ -296,28 +296,32 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 spread.pilb<-function(pop, gens, pairs, target, delta, r, plot=FALSE){ #pairs is a list from pdist.fast  
 for (i in 1:gens){
 		#if (i%%5==0) output(pop, i, K)
-		occp<-subset(pop, pop[,"Pres"]==1) #collect occupied sites
-		occp<-cbind(occp, lambda=rpois(nrow(occp), delta))
-		gma<-sum(occp[,"lambda"])
-		potl_pairs<-pairs[occp[,"ID"]] #collect relevant parts of pair list
-		potl<-do.call("rbind", potl_pairs)
-		src.ID<-rep(occp[,"ID"], times=occp[,"n.pairs"])
-		potl<-cbind(src.ID, potl)
-		lambda<-rep(occp[,"lambda"], times=occp[,"n.pairs"])
-		U<-rep(occp[,"u"], times=occp[,"n.pairs"]) #expand source specific kernel parameters
-		V<-rep(occp[,"v"], times=occp[,"n.pairs"])
-		recruits<-lambda*dcncross(potl[,"dists"]+0.05, U, V) #calculate densities attributable to each pair
-		#browser()
-		recruits<-(pi*r^2*neigh.corr(pairs, r))/gma*tapply(recruits, potl[,"snk.ID"], sum) #sum densities from colonised waterbodies over all waterbodies and convert to proportion
-		failures<-1-sum(recruits)
+		occp <- pop[,"Pres"]==1 #which sites are occupied
+		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
+		gma <- sum(lambda_t_x) # total propagules at this time step
+		pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pair matrix
+		marg_dens <- apply(pairs_t, # get probability density accruing from each source
+		                   MARGIN = 2, 
+		                   FUN = dcncross, 
+		                   u = pop[occp,"u"], 
+		                   v = pop[occp,"v"])
+		marg_dens <- sweep(marg_dens, # make into toad density
+		                   MARGIN = 1, 
+		                   STATS = lambda_t_x, 
+		                   FUN = "*")
+		marg_expected_n <- sweep(marg_dens, # make into expected count
+		                         MARGIN = c(1,2), 
+		                         STATS = pi*r^2, 
+		                         FUN = "*")
+		expected_n <- colSums(marg_expected_n, na.rm = TRUE) # sum contributions from all sources
+		failures <- gma-sum(expected_n)
 		if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
-		recruits<-c(recruits, failures) #add on the failures
-		recruit.ID<-as.integer(names(recruits)[-length(recruits)])
-		recruits<-rmultinom(1, gma, recruits)[-length(recruits)]
-		recruits<-cbind(recruit.ID, recruits)
-		recruits<-subset(recruits, recruits[,"recruits"]>2)
-		pop[match(recruits[,"recruit.ID"], pop[,"ID"]), "Pres"]<-1
-		pop[which(pop[,"Pres"]==1), "age"]<-1+pop[which(pop[,"Pres"]==1), "age"]
+		expected_n <- c(expected_n, failures) # add failures
+		realised_n <- rmultinom(1, gma, expected_n)[-length(expected_n)] # draw propagules
+		colonised <- realised_n > 2
+		pop[colonised, "Pres"] <- 1 #set to colonised
+		occp <- pop[,"Pres"]==1 #which sites are occupied now
+		pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
 		if (plot==TRUE) plotter(pop, file.name=paste(i,".png", sep=""), gen=i)
     if (sum(pop[target,"Pres"])>0) break
 	}

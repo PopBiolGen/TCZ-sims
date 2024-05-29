@@ -168,6 +168,24 @@ pdist.fast<-function(X, Y, maximum=500000,space.size= 500000){
 	out
 }
 
+# Computes full distance matrix given vectors of X, and Y coordinates
+pdist <- function(X, Y, maximum=500000){
+  X<-X-min(X) # start coordinates at zero
+  Y<-Y-min(Y)
+  # function for calculating squared distances along each axis
+  sq.dist <- function(x_1, x_2){
+    (x_1-x_2)^2
+  }
+  # returns euclidean distance given squared distances along x and y (thanks Pythagoras)
+  euc.dist <- function(sq.dist.x, sq.dist.y){
+    sqrt(sq.dist.x + sq.dist.y)
+  }
+  s.d.x <- outer(X, X, FUN = sq.dist)
+  s.d.y <- outer(Y, Y, FUN = sq.dist)
+  p.dist <- euc.dist(s.d.x, s.d.y)
+  p.dist
+}
+
 #plots opportunities and colonised populations
 plotter<-function(popmatrix, file.name="temp.png", gen){
   png(filename=file.name, width=7, height=7, units="cm", res=150, pointsize=6)

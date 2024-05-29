@@ -81,7 +81,8 @@ neighbours.init<-function(space.size, cell.size){
 neigh.corr<-function(pairs, r){
   #collect pairs less than 2r distant
   corrn<-function(x){
-    temp<-matrix(x[x[,"dists"]<=2*r & x[,"dists"]>0,], ncol=2)
+    ss <- x[,"dists"]<=2*r & x[,"dists"]>0
+    temp<-matrix(x[ss,], ncol=2)
     if (length(temp)==0) return(1)
     theta<-2*acos(temp[,2]/(2*r))
     out<-1-(theta-sin(theta))/(2*pi)
@@ -135,36 +136,22 @@ pathway<-function(pdist.list, point, n.points=2, natural){
 }
 
 
-
-# Fast calculation of pairwise distances
-pdist.fast<-function(X, Y, maximum, space.size){
-	X<-X-min(X) # start coordinates at zero
-	Y<-Y-min(Y)
-	lth<-space.size/maximum
-	if (lth%%1!=0) {
-		print("Error: maximum must divide into space.size perfectly")
-		return(NULL)	
-	}
-	out<-vector("list", length=length(X)) #list to take neightbour.ID and distance
-	points<-vector("list", length=lth^2)#matrix of lists of point IDs
-	gX<-X%/%maximum+1 #collapse to grid refs
-	gY<-Y%/%maximum+1
-	neigh<-neighbours.init(space.size, maximum)
-	for (i in 1:length(X)){ #throw point IDs into grid cell list
-		temp<-flatmat(gX[i], gY[i], lth)
-		points[[temp]]<-c(points[[temp]], i)
-	}
-	for (i in 1:length(X)){
-		nb<-neigh[,,gX[i], gY[i]] #find neighbouring cells
-		nb<-subset(nb, is.na(apply(nb,1,sum))==F)
-		temp<-flatmat(nb[,1], nb[,2], lth) #find relevant points
-		snk.ID<-unlist(points[temp])
-		dists<-sqrt((X[i]-X[snk.ID])^2+(Y[i]-Y[snk.ID])^2)
-		temp<-cbind(snk.ID, dists)
-		temp<-subset(temp, temp[,"dists"]<=maximum)
-		out[[i]]<-temp
-	}	
-	out
+# Computes full distance matrix given vectors of X, and Y coordinates
+pdist <- function(X, Y, maximum=500000){
+  X<-X-min(X) # start coordinates at zero
+  Y<-Y-min(Y)
+  # function for calculating squared distances along each axis
+  sq.dist <- function(x_1, x_2){
+    (x_1-x_2)^2
+  }
+  # returns euclidean distance given squared distances along x and y (thanks Pythagoras)
+  euc.dist <- function(sq.dist.x, sq.dist.y){
+    sqrt(sq.dist.x + sq.dist.y)
+  }
+  s.d.x <- outer(X, X, FUN = sq.dist)
+  s.d.y <- outer(Y, Y, FUN = sq.dist)
+  p.dist <- euc.dist(s.d.x, s.d.y)
+  p.dist
 }
 
 #plots opportunities and colonised populations
@@ -217,45 +204,57 @@ for (i in 1:gens){
 
 # Sets up the spread table and pulls parameters ready for simulations
   # returns the spread table
-setup <- function(point.data = "dat/art_nat_clp.csv") {
+setup <- function(point.data = "dat/art_nat_clp.csv", 
+                  X.id = "POINT_X", 
+                  Y.id = "POINT_Y", 
+                  present.id = "ARRIVE_MCP",
+                  artificial.natural.id = "art_nat",
+                  rain.id = "rain_1mm",
+                  ...){
   load("dat/Kernel_fits.RData")
-  plb<-read.csv(point.data)
+  if (is.object(point.data)) { 
+    pData <- point.data
+  } else {
+      pData<-read.csv(point.data)
+    }
+  
   load("dat/Posteriors.RData")
   
   #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
   #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
-  pairs_pdist<-pdist.fast(X=plb$POINT_X,Y=plb$POINT_Y,maximum=500000,space.size= 500000)
+  pairs_pdist<-pdist(X=pData[[X.id]],Y=pData[[Y.id]], ...)
   
   #get matrix for the 'spread' function
   # need matrix containing:
   # "ID, X, Y, Pres (0s), n.pairs, u (rainy days*85.35[which is estimate of u]), 
   # age (0s)"
   
-  ID<-as.numeric(rownames(plb))
-  X<-plb$POINT_X
-  Y<-plb$POINT_Y
-  Pres<-plb$ARRIVE_MCP
+  ID<-1:nrow(pData)
+  X<-pData[[X.id]]
+  Y<-pData[[Y.id]]
+  Pres<-pData[[present.id]]
   age<-rep(0,length(X))
   target<-which(Pres==2)
   Pres[Pres==2]<-0
-  nats<-which(plb$art_nat==0)
-  arts<-which(plb$art_nat==1)
+  nats<-which(pData[[artificial.natural.id]]==0)
+  arts<-which(pData[[artificial.natural.id]]==1)
   
   
   # calculate n.pairs using pdist
   n.pairs<-do.call("c",lapply(pairs_pdist,nrow))
   
-  u<-(plb$rain_1mm-1)/364
+  u<-(pData[[rain.id]]-1)/364
   u<-3*(u-u^2) + u^3
-  u<-plb$rain_1mm+3*plb$rain_1mm*(1-u)
+  u<-pData[[rain.id]]+3*pData[[rain.id]]*(1-u)
   u<-floor(u)
   load("dat/Kernel_fits.RData")
   
   u<-fits[u,1:2]
   
-  assign("spread.table", 
-         as.matrix(cbind(ID,X,Y,Pres,n.pairs,u,age),nrow=length(age),ncol=7),
-         envir = .GlobalEnv)
+  spread.table <-  as.matrix(cbind(ID,X,Y,Pres,n.pairs,u,age),nrow=length(age),ncol=7)
+  
+  outList <- list(spread.table = spread.table, pairs = pairs_pdist, nats = nats, arts = arts, target = target)
+  list2env(outList, envir = globalenv())
 }
 
 
@@ -265,28 +264,32 @@ setup <- function(point.data = "dat/art_nat_clp.csv") {
 spread.pilb<-function(pop, gens, pairs, target, delta, r, plot=FALSE){ #pairs is a list from pdist.fast  
 for (i in 1:gens){
 		#if (i%%5==0) output(pop, i, K)
-		occp<-subset(pop, pop[,"Pres"]==1) #collect occupied sites
-		occp<-cbind(occp, lambda=rpois(nrow(occp), delta))
-		gma<-sum(occp[,"lambda"])
-		potl<-pairs[occp[,"ID"]] #collect relevant parts of pair list
-		potl<-do.call("rbind", potl)
-		src.ID<-rep(occp[,"ID"], times=occp[,"n.pairs"])
-		potl<-cbind(src.ID, potl)
-		lambda<-rep(occp[,"lambda"], times=occp[,"n.pairs"])
-		U<-rep(occp[,"u"], times=occp[,"n.pairs"]) #expand source specific kernel parameters
-		V<-rep(occp[,"v"], times=occp[,"n.pairs"])
-		recruits<-lambda*dcncross(potl[,"dists"]+0.05, U, V) #calculate densities attributable to each pair
-		#browser()
-		recruits<-(pi*r^2*neigh.corr(pairs, r))/gma*tapply(recruits, potl[,"snk.ID"], sum) #sum densities from colonised waterbodies over all waterbodies and convert to proportion
-		failures<-1-sum(recruits)
+		occp <- pop[,"Pres"]==1 #which sites are occupied
+		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
+		gma <- sum(lambda_t_x) # total propagules at this time step
+		pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pair matrix
+		marg_dens <- apply(pairs_t, # get probability density accruing from each source
+		                   MARGIN = 2, 
+		                   FUN = dcncross, 
+		                   u = pop[occp,"u"], 
+		                   v = pop[occp,"v"])
+		marg_dens <- sweep(marg_dens, # make into toad density
+		                   MARGIN = 1, 
+		                   STATS = lambda_t_x, 
+		                   FUN = "*")
+		marg_expected_n <- sweep(marg_dens, # make into expected count
+		                         MARGIN = c(1,2), 
+		                         STATS = pi*r^2, 
+		                         FUN = "*")
+		expected_n <- colSums(marg_expected_n, na.rm = TRUE) # sum contributions from all sources
+		failures <- gma-sum(expected_n)
 		if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
-		recruits<-c(recruits, failures) #add on the failures
-		recruit.ID<-as.integer(names(recruits)[-length(recruits)])
-		recruits<-rmultinom(1, gma, recruits)[-length(recruits)]
-		recruits<-cbind(recruit.ID, recruits)
-		recruits<-subset(recruits, recruits[,"recruits"]>2)
-		pop[match(recruits[,"recruit.ID"], pop[,"ID"]), "Pres"]<-1
-		pop[which(pop[,"Pres"]==1), "age"]<-1+pop[which(pop[,"Pres"]==1), "age"]
+		expected_n <- c(expected_n, failures) # add failures
+		realised_n <- rmultinom(1, gma, expected_n)[-length(expected_n)] # draw propagules
+		colonised <- realised_n > 2
+		pop[colonised, "Pres"] <- 1 #set to colonised
+		occp <- pop[,"Pres"]==1 #which sites are occupied now
+		pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
 		if (plot==TRUE) plotter(pop, file.name=paste(i,".png", sep=""), gen=i)
     if (sum(pop[target,"Pres"])>0) break
 	}

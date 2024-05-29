@@ -136,38 +136,6 @@ pathway<-function(pdist.list, point, n.points=2, natural){
 }
 
 
-
-# Fast calculation of pairwise distances
-pdist.fast<-function(X, Y, maximum=500000,space.size= 500000){
-	X<-X-min(X) # start coordinates at zero
-	Y<-Y-min(Y)
-	lth<-space.size/maximum
-	if (lth%%1!=0) {
-		print("Error: maximum must divide into space.size perfectly")
-		return(NULL)	
-	}
-	out<-vector("list", length=length(X)) #list to take neightbour.ID and distance
-	points<-vector("list", length=lth^2)#matrix of lists of point IDs
-	gX<-X%/%maximum+1 #collapse to grid refs
-	gY<-Y%/%maximum+1
-	neigh<-neighbours.init(space.size, maximum)
-	for (i in 1:length(X)){ #throw point IDs into grid cell list
-		temp<-flatmat(gX[i], gY[i], lth)
-		points[[temp]]<-c(points[[temp]], i)
-	}
-	for (i in 1:length(X)){
-		nb<-neigh[,,gX[i], gY[i]] #find neighbouring cells
-		nb<-subset(nb, is.na(apply(nb,1,sum))==F)
-		temp<-flatmat(nb[,1], nb[,2], lth) #find relevant points
-		snk.ID<-unlist(points[temp])
-		dists<-sqrt((X[i]-X[snk.ID])^2+(Y[i]-Y[snk.ID])^2)
-		temp<-cbind(snk.ID, dists)
-		temp<-subset(temp, temp[,"dists"]<=maximum)
-		out[[i]]<-temp
-	}	
-	out
-}
-
 # Computes full distance matrix given vectors of X, and Y coordinates
 pdist <- function(X, Y, maximum=500000){
   X<-X-min(X) # start coordinates at zero
@@ -254,7 +222,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
   #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
-  pairs_pdist<-pdist.fast(X=pData[[X.id]],Y=pData[[Y.id]], ...)
+  pairs_pdist<-pdist(X=pData[[X.id]],Y=pData[[Y.id]], ...)
   
   #get matrix for the 'spread' function
   # need matrix containing:

@@ -81,7 +81,8 @@ neighbours.init<-function(space.size, cell.size){
 neigh.corr<-function(pairs, r){
   #collect pairs less than 2r distant
   corrn<-function(x){
-    temp<-matrix(x[x[,"dists"]<=2*r & x[,"dists"]>0,], ncol=2)
+    ss <- x[,"dists"]<=2*r & x[,"dists"]>0
+    temp<-matrix(x[ss,], ncol=2)
     if (length(temp)==0) return(1)
     theta<-2*acos(temp[,2]/(2*r))
     out<-1-(theta-sin(theta))/(2*pi)
@@ -137,7 +138,7 @@ pathway<-function(pdist.list, point, n.points=2, natural){
 
 
 # Fast calculation of pairwise distances
-pdist.fast<-function(X, Y, maximum, space.size){
+pdist.fast<-function(X, Y, maximum=500000,space.size= 500000){
 	X<-X-min(X) # start coordinates at zero
 	Y<-Y-min(Y)
 	lth<-space.size/maximum
@@ -217,45 +218,57 @@ for (i in 1:gens){
 
 # Sets up the spread table and pulls parameters ready for simulations
   # returns the spread table
-setup <- function(point.data = "dat/art_nat_clp.csv") {
+setup <- function(point.data = "dat/art_nat_clp.csv", 
+                  X.id = "POINT_X", 
+                  Y.id = "POINT_Y", 
+                  present.id = "ARRIVE_MCP",
+                  artificial.natural.id = "art_nat",
+                  rain.id = "rain_1mm",
+                  ...){
   load("dat/Kernel_fits.RData")
-  plb<-read.csv(point.data)
+  if (is.object(point.data)) { 
+    pData <- point.data
+  } else {
+      pData<-read.csv(point.data)
+    }
+  
   load("dat/Posteriors.RData")
   
   #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
   #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
-  pairs_pdist<-pdist.fast(X=plb$POINT_X,Y=plb$POINT_Y,maximum=500000,space.size= 500000)
+  pairs_pdist<-pdist.fast(X=pData[[X.id]],Y=pData[[Y.id]], ...)
   
   #get matrix for the 'spread' function
   # need matrix containing:
   # "ID, X, Y, Pres (0s), n.pairs, u (rainy days*85.35[which is estimate of u]), 
   # age (0s)"
   
-  ID<-as.numeric(rownames(plb))
-  X<-plb$POINT_X
-  Y<-plb$POINT_Y
-  Pres<-plb$ARRIVE_MCP
+  ID<-1:nrow(pData)
+  X<-pData[[X.id]]
+  Y<-pData[[Y.id]]
+  Pres<-pData[[present.id]]
   age<-rep(0,length(X))
   target<-which(Pres==2)
   Pres[Pres==2]<-0
-  nats<-which(plb$art_nat==0)
-  arts<-which(plb$art_nat==1)
+  nats<-which(pData[[artificial.natural.id]]==0)
+  arts<-which(pData[[artificial.natural.id]]==1)
   
   
   # calculate n.pairs using pdist
   n.pairs<-do.call("c",lapply(pairs_pdist,nrow))
   
-  u<-(plb$rain_1mm-1)/364
+  u<-(pData[[rain.id]]-1)/364
   u<-3*(u-u^2) + u^3
-  u<-plb$rain_1mm+3*plb$rain_1mm*(1-u)
+  u<-pData[[rain.id]]+3*pData[[rain.id]]*(1-u)
   u<-floor(u)
   load("dat/Kernel_fits.RData")
   
   u<-fits[u,1:2]
   
-  assign("spread.table", 
-         as.matrix(cbind(ID,X,Y,Pres,n.pairs,u,age),nrow=length(age),ncol=7),
-         envir = .GlobalEnv)
+  spread.table <-  as.matrix(cbind(ID,X,Y,Pres,n.pairs,u,age),nrow=length(age),ncol=7)
+  
+  outList <- list(spread.table = spread.table, pairs = pairs_pdist, nats = nats, arts = arts, target = target)
+  list2env(outList, envir = globalenv())
 }
 
 
@@ -268,8 +281,8 @@ for (i in 1:gens){
 		occp<-subset(pop, pop[,"Pres"]==1) #collect occupied sites
 		occp<-cbind(occp, lambda=rpois(nrow(occp), delta))
 		gma<-sum(occp[,"lambda"])
-		potl<-pairs[occp[,"ID"]] #collect relevant parts of pair list
-		potl<-do.call("rbind", potl)
+		potl_pairs<-pairs[occp[,"ID"]] #collect relevant parts of pair list
+		potl<-do.call("rbind", potl_pairs)
 		src.ID<-rep(occp[,"ID"], times=occp[,"n.pairs"])
 		potl<-cbind(src.ID, potl)
 		lambda<-rep(occp[,"lambda"], times=occp[,"n.pairs"])

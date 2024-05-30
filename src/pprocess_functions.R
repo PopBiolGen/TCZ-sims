@@ -229,15 +229,15 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   # "ID, X, Y, Pres (0s), n.pairs, u (rainy days*85.35[which is estimate of u]), 
   # age (0s)"
   
-  ID<-1:nrow(pData)
-  X<-pData[[X.id]]
-  Y<-pData[[Y.id]]
-  Pres<-pData[[present.id]]
-  age<-rep(0,length(X))
-  target<-which(Pres==2)
-  Pres[Pres==2]<-0
-  nats<-which(pData[[artificial.natural.id]]==0)
-  arts<-which(pData[[artificial.natural.id]]==1)
+  ID <- 1:nrow(pData)
+  X <- pData[[X.id]]
+  Y <- pData[[Y.id]]
+  Pres <- pData[[present.id]]
+  target <- which(Pres==2)
+  Pres[Pres==2] <- 0
+  age <- Pres # set already colonised to age = 1
+  nats <- which(pData[[artificial.natural.id]]==0)
+  arts <- which(pData[[artificial.natural.id]]==1)
   
   
   # calculate n.pairs using pdist

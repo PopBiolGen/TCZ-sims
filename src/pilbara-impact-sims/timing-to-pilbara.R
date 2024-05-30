@@ -1,3 +1,5 @@
+library(dplyr)
+
 ######## load functions ########
 source("src/pprocess_functions.R")
 
@@ -31,6 +33,8 @@ for (rr in 1:reps){ # for reps
   output[[rr]]<-temp
 }
 
+######## save output and generate summaries ########
+# time to arrive
 save(output, file = "out/timing-to-pilbara.Rdata")
 
 time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
@@ -40,3 +44,14 @@ pdf(file = "out/time-to-pilbara.pdf")
 dev.off()
 
 summary(time.vec)
+
+# Mean time to each point
+pop.out <- lapply(output, FUN = function(x){x$popmatrix})
+pop.out <- do.call("rbind", pop.out)
+pop.out <- pop.out %>% 
+  as.data.frame() %>%
+  group_by(ID) %>%
+  summarise_all(mean) %>%
+  mutate(arrival = round(2024+max(age)-age))
+write.csv(pop.out, file = "out/spread-TCZ timing.csv", row.names = FALSE)
+# plot(Y~X, data = pop.out, col=as.numeric(as.factor(pop.out$arrival)))

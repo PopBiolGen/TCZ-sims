@@ -34,7 +34,7 @@ for (rr in 1:reps){ # for reps
 }
 
 ######## save output and generate summaries ########
-# time to arrive
+# time to arrive in Pilbara
 save(output, file = "out/timing-to-pilbara.Rdata")
 
 time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
@@ -45,7 +45,7 @@ dev.off()
 
 summary(time.vec)
 
-# Mean time to each point
+# Mean time to and arrival year for each point
 pop.out <- lapply(output, FUN = function(x){x$popmatrix})
 pop.out <- do.call("rbind", pop.out)
 pop.out <- pop.out %>% 
@@ -53,5 +53,5 @@ pop.out <- pop.out %>%
   group_by(ID) %>%
   summarise_all(mean) %>%
   mutate(arrival = round(2024+max(age)-age))
-write.csv(pop.out, file = "out/spread-TCZ timing.csv", row.names = FALSE)
+write.csv(pop.out, file = "out/spread-TCZ-timing.csv", row.names = FALSE)
 # plot(Y~X, data = pop.out, col=as.numeric(as.factor(pop.out$arrival)))

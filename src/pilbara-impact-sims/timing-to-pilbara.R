@@ -28,7 +28,7 @@ output<-vector("list", length=reps) # vector to take outputs
 for (rr in 1:reps){ # for reps
   lambda.samp<-10^rnorm(1, mean=sample.lambda, sd=sample.lambda.sd)
   r.samp<-10^2
-  temp<-spread.pilb(pop=spread.table, gens=100, pairs=pairs, target=target, delta=lambda.samp, r=r.samp)
+  temp<-spread.pilb(pop=spread.table, gens=100, pairs=pairs, delta=lambda.samp, r=r.samp)
   temp<-c(temp, list(pars=cbind(lambda=lambda.samp, r=r.samp)))
   output[[rr]]<-temp
 }

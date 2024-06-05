@@ -137,7 +137,7 @@ pathway<-function(pdist.list, point, n.points=2, natural){
 
 
 # Computes full distance matrix given vectors of X, and Y coordinates
-pdist <- function(X, Y, maximum=500000){
+pdist <- function(X, Y){
   X<-X-min(X) # start coordinates at zero
   Y<-Y-min(Y)
   # function for calculating squared distances along each axis
@@ -167,7 +167,7 @@ plotter<-function(popmatrix, file.name="temp.png", gen){
 # Finds points closer than threshold distance apart and removes one of the points
 # returns a filtered population table
 # to be used before creation of the spread table.
-remove_spatial_duplicates <- function(pop.mat, threshold = 100){
+remove_spatial_duplicates <- function(pop.mat, threshold){
   X <- pop.mat[,"X"]
   Y <- pop.mat[, "Y"]
   pDists <- pdist(X, Y) # get pairwise distances
@@ -225,7 +225,8 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   artificial.natural.id = "art_nat",
                   rain.id = "rain_1mm",
                   remove_duplicates = TRUE,
-                  ...){
+                  threshold = 100
+                  ){
   load("dat/Kernel_fits.RData")
   if (is.object(point.data)) { 
     pData <- point.data
@@ -259,10 +260,10 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   spread.table <-  cbind(ID, X, Y, Pres, target, u, age, nats)
   
   if (remove_duplicates) {
-    spread.table <- remove_spatial_duplicates(spread.table)
+    spread.table <- remove_spatial_duplicates(spread.table, threshold)
   }
   
-  pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"], ...)
+  pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
   
   outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   list2env(outList, envir = globalenv())

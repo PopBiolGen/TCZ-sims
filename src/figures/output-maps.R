@@ -47,8 +47,12 @@ ggmap_bbox <- function(map) {
 basemap <- ggmap_bbox(basemap)
 
 p <- ggmap(basemap) + 
-  coord_sf(crs = st_crs(3857)) + # force the ggplot2 map to be in 3857
-  geom_sf(data = st_transform(d, 3857), mapping = aes(colour = arrival), inherit.aes = FALSE)
+  coord_sf(crs = st_crs(3857), # force the ggplot2 map to be in 3857
+           xlim = c(119.3, 124),
+           ylim = c(-20.8, -17.5)) + 
+  geom_sf(data = st_transform(d, 3857), 
+          mapping = aes(colour = arrival), 
+          inherit.aes = FALSE)
 
 p
 

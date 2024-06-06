@@ -4,7 +4,6 @@ library(dplyr)
 source("src/pprocess_functions.R")
 
 ######## load data ########
-#load("dat/Kernel_fits.RData")
 load("dat/Posteriors.RData")
 
 tczPoints <-read.csv("dat/merged_clipped_for_simulation.csv")
@@ -18,7 +17,7 @@ setup(point.data = tczPoints,
       present.id = "colonised",
       artificial.natural.id = "origin_des",
       rain.id = "daysRain_1",
-      maximum=100000)
+      threshold = 50)
 
 
 ######## how long to the pilbara (in wet seasons from 2023/4) ########
@@ -52,6 +51,6 @@ pop.out <- pop.out %>%
   as.data.frame() %>%
   group_by(ID) %>%
   summarise_all(mean) %>%
-  mutate(arrival = round(2024+max(age)-age))
+  mutate(arrival = round(2023+max(age)-age))
 write.csv(pop.out, file = "out/spread-TCZ-timing.csv", row.names = FALSE)
 # plot(Y~X, data = pop.out, col=as.numeric(as.factor(pop.out$arrival)))

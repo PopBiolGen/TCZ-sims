@@ -137,7 +137,7 @@ pathway<-function(pdist.list, point, n.points=2, natural){
 
 
 # Computes full distance matrix given vectors of X, and Y coordinates
-pdist <- function(X, Y, maximum=500000){
+pdist <- function(X, Y){
   X<-X-min(X) # start coordinates at zero
   Y<-Y-min(Y)
   # function for calculating squared distances along each axis
@@ -162,6 +162,20 @@ plotter<-function(popmatrix, file.name="temp.png", gen){
   points(occp[,2], occp[,3], pch=19, col="red")
   legend('topleft', legend=paste("Time =", gen), bty="n", pch=NA, cex=1.5)
   dev.off()
+}
+
+# Finds points closer than threshold distance apart and removes one of the points
+# returns a filtered population table
+# to be used before creation of the spread table.
+remove_spatial_duplicates <- function(pop.mat, threshold){
+  X <- pop.mat[,"X"]
+  Y <- pop.mat[, "Y"]
+  pDists <- pdist(X, Y) # get pairwise distances
+  pDists[lower.tri(pDists, diag = TRUE)] <- threshold # set relevant parts to >threshold
+  below_threshold <- function(x){x < threshold} 
+  tooClose <- apply(pDists, MARGIN = 1, FUN = below_threshold) # matrix
+  tooClose <- apply(tooClose, 2, FUN = sum) == 0 # colsums == 0
+  pop.mat[tooClose,]
 }
 
 # spreads the population over gen generations, and compares predictions to observed spread
@@ -210,7 +224,9 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   present.id = "ARRIVE_MCP",
                   artificial.natural.id = "art_nat",
                   rain.id = "rain_1mm",
-                  ...){
+                  remove_duplicates = TRUE,
+                  threshold = 100
+                  ){
   load("dat/Kernel_fits.RData")
   if (is.object(point.data)) { 
     pData <- point.data
@@ -219,41 +235,37 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
     }
   
   load("dat/Posteriors.RData")
-  
-  #max(plb$POINT_X)-min(plb$POINT_X) # 436252.5
-  #max(plb$POINT_Y)-min(plb$POINT_Y) # 318785.0
-  pairs_pdist<-pdist(X=pData[[X.id]],Y=pData[[Y.id]], ...)
-  
   #get matrix for the 'spread' function
   # need matrix containing:
   # "ID, X, Y, Pres (0s), n.pairs, u (rainy days*85.35[which is estimate of u]), 
   # age (0s)"
   
-  ID<-1:nrow(pData)
-  X<-pData[[X.id]]
-  Y<-pData[[Y.id]]
-  Pres<-pData[[present.id]]
-  age<-rep(0,length(X))
-  target<-which(Pres==2)
-  Pres[Pres==2]<-0
-  nats<-which(pData[[artificial.natural.id]]==0)
-  arts<-which(pData[[artificial.natural.id]]==1)
+  ID <- 1:nrow(pData)
+  X <- pData[[X.id]]
+  Y <- pData[[Y.id]]
+  Pres <- pData[[present.id]]
+  target <- Pres==2
+  Pres[Pres==2] <- 0
+  age <- Pres # set already colonised to age = 1
+  nats <- pData[[artificial.natural.id]]==0
   
+  u <- (pData[[rain.id]]-1)/364
+  u <- 3*(u-u^2) + u^3
+  u <- pData[[rain.id]]+3*pData[[rain.id]]*(1-u)
+  u <- floor(u)
   
-  # calculate n.pairs using pdist
-  n.pairs<-do.call("c",lapply(pairs_pdist,nrow))
-  
-  u<-(pData[[rain.id]]-1)/364
-  u<-3*(u-u^2) + u^3
-  u<-pData[[rain.id]]+3*pData[[rain.id]]*(1-u)
-  u<-floor(u)
-  load("dat/Kernel_fits.RData")
   
   u<-fits[u,1:2]
   
-  spread.table <-  as.matrix(cbind(ID,X,Y,Pres,n.pairs,u,age),nrow=length(age),ncol=7)
+  spread.table <-  cbind(ID, X, Y, Pres, target, u, age, nats)
   
-  outList <- list(spread.table = spread.table, pairs = pairs_pdist, nats = nats, arts = arts, target = target)
+  if (remove_duplicates) {
+    spread.table <- remove_spatial_duplicates(spread.table, threshold)
+  }
+  
+  pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
+  
+  outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   list2env(outList, envir = globalenv())
 }
 
@@ -261,7 +273,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 # spreads the population over gens generations or until target sites are reached
 # returns number of generations
 # target is a vector of rows of pop that contain targets
-spread.pilb<-function(pop, gens, pairs, target, delta, r, plot=FALSE){ #pairs is a list from pdist.fast  
+spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list from pdist.fast  
 for (i in 1:gens){
 		#if (i%%5==0) output(pop, i, K)
 		occp <- pop[,"Pres"]==1 #which sites are occupied
@@ -291,7 +303,7 @@ for (i in 1:gens){
 		occp <- pop[,"Pres"]==1 #which sites are occupied now
 		pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
 		if (plot==TRUE) plotter(pop, file.name=paste(i,".png", sep=""), gen=i)
-    if (sum(pop[target,"Pres"])>0) break
+    if (sum(pop[pop[, "target"]==1,"Pres"])>0) break
 	}
 	list(gen=i, popmatrix=pop)	
 }

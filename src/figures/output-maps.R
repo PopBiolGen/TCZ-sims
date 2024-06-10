@@ -6,6 +6,10 @@ library(ggplot2)
 library(sf)
 library(tmap)
 library(tmaptools)
+library(dplyr)
+library(magick)
+
+######### Make a static map of estiamted arrival time #########
 
 # read in the point data
 d <- read.csv(file = "out/spread-TCZ-timing.csv")
@@ -46,54 +50,23 @@ tmap_save(p, filename = "out/year-of-arrival.pdf")
 # ggplot() +
 #   geom_spatraster
 
-# Alternative experiment with google map -- here for future reference only
-# library(lubridate)
-# library(ggrepel)
-# library(ggmap)
-# library(tidyverse)
+######### Make a dynamic map of estimated arrival time #########
+fpath <- "out/dynamic_maps/"
+mapYears <- sort(unique(d$arrival))
+for (yy in mapYears){
+  temp <- filter(d, arrival <= yy)
+  fname <- paste0(fpath, yy, ".png")
+  p <- tm_shape(bm,
+                unit = "km") +
+    tm_rgb() +
+    tm_shape(temp) +
+    tm_dots(size = 0.2,
+            col = "red") +
+    tm_layout(title = as.character(yy))
+  tmap_save(p, filename = fname)
+}
 
-# register_google(key = Sys.getenv("GOOGLE_MAP_API_KEY"))
-# 
-# basemap <- get_googlemap(
-#     center = c(lon = 121.5, lat = -19.123426),
-#     zoom = 7,
-#     size = c(640, 640),
-#     maptype = "hybrid"
-#     )
-# 
-# # function to hack the ggmap bounding box to map google map default
-# # from https://stackoverflow.com/questions/47749078/how-to-put-a-geom-sf-produced-map-on-top-of-a-ggmap-produced-raster
-# ggmap_bbox <- function(map) {
-#   if (!inherits(map, "ggmap")) stop("map must be a ggmap object")
-#   # Extract the bounding box (in lat/lon) from the ggmap to a numeric vector, 
-#   # and set the names to what sf::st_bbox expects:
-#   map_bbox <- setNames(unlist(attr(map, "bb")), 
-#                        c("ymin", "xmin", "ymax", "xmax"))
-#   
-#   # Coonvert the bbox to an sf polygon, transform it to 3857, 
-#   # and convert back to a bbox (convoluted, but it works)
-#   bbox_3857 <- st_bbox(st_transform(st_as_sfc(st_bbox(map_bbox, crs = 4326)), 3857))
-#   
-#   # Overwrite the bbox of the ggmap object with the transformed coordinates 
-#   attr(map, "bb")$ll.lat <- bbox_3857["ymin"]
-#   attr(map, "bb")$ll.lon <- bbox_3857["xmin"]
-#   attr(map, "bb")$ur.lat <- bbox_3857["ymax"]
-#   attr(map, "bb")$ur.lon <- bbox_3857["xmax"]
-#   map
-# }
-# 
-# basemap <- ggmap_bbox(basemap)
-# 
-# p <- ggmap(basemap) + 
-#   coord_sf(crs = st_crs(3857), # force the ggplot2 map to be in 3857
-#            xlim = c(119.3, 124),
-#            ylim = c(-20.8, -17.5)) + 
-#   geom_sf(data = st_transform(d, 3857), 
-#           mapping = aes(colour = arrival), 
-#           inherit.aes = FALSE)
-# 
-# p
-
-
-
-
+flist <- paste0(fpath, mapYears, ".png")
+images <- image_read(flist)
+animation <- image_animate(images, fps = 1)
+image_write(animation, path = "out/dynamic_maps/animated_map.gif")

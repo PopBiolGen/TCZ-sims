@@ -67,12 +67,14 @@ for (yy in input.flist){
     tm_rgb() +
     tm_shape(temp) +
     tm_dots(size = 0.2,
-            col = prob.colonised) +
+            col = "prob.colonised",
+            breaks = seq(0, 1, length.out = 5),
+            title = "Probability of colonisation") +
     tm_layout(title = year.name)
   tmap_save(p, filename = fname)
 }
 
-flist <- paste0(fpath, mapYears, ".png")
-images <- image_read(flist)
+flist <- list.files(path = fpath, pattern = ".png")
+images <- image_read(paste0(fpath, flist))
 animation <- image_animate(images, fps = 1)
 image_write(animation, path = "out/dynamic_maps/animated_map.gif")

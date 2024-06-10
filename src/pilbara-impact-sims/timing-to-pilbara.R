@@ -20,7 +20,7 @@ setup(point.data = tczPoints,
       threshold = 50)
 
 
-######## how long to the pilbara (in wet seasons from 2023/4) ########
+######## how long to the pilbara (in wet seasons from dry season of 2023) ########
 reps <- 100
 output<-vector("list", length=reps) # vector to take outputs
 
@@ -44,13 +44,36 @@ dev.off()
 
 summary(time.vec)
 
-# Mean time to and arrival year for each point
-pop.out <- lapply(output, FUN = function(x){x$popmatrix})
-pop.out <- do.call("rbind", pop.out)
-pop.out <- pop.out %>% 
+# Work out mean time to and arrival year for each point
+
+add_index_column <- function(x, index) { # Function to add index column to each matrix
+  mat <- x$popmatrix
+  index_col <- rep(index, n = nrow(mat))
+  arrival <- round(2023+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
+  cbind(index_col, mat, arrival)
+}
+# Apply the function to each element of the list using lapply
+modified_matrices <- lapply(seq_along(output), function(i) {
+  add_index_column(output[[i]], i)
+})
+# bind the lot together into single matrix
+pop.out <- do.call("rbind", modified_matrices)
+
+# get mean arrival time for each point, or making a static map
+pop.summary <- pop.out %>% 
   as.data.frame() %>%
   group_by(ID) %>%
-  summarise_all(mean) %>%
-  mutate(arrival = round(2023+max(age)-age))
-write.csv(pop.out, file = "out/spread-TCZ-timing.csv", row.names = FALSE)
-# plot(Y~X, data = pop.out, col=as.numeric(as.factor(pop.out$arrival)))
+  summarise_all(mean)
+write.csv(pop.summary, file = "out/spread-TCZ-timing.csv", row.names = FALSE) 
+
+# to make a dynamic map...
+# for each year, 2023 to max(mean arrival time), generate a csv to plot, that reports probability of colonisation at that time for each waterpoint
+for (yy in 2023:max.time){
+  fname <- paste0("out/dynamic_maps/", yy, ".csv")
+  pop.summary <- pop.out %>%
+    as.data.frame() %>%
+    group_by(ID) %>%
+    summarise(X = mean(X), Y = mean(Y), prob.colonised = mean(arrival <= yy)) %>%
+    filter(prob.colonised > 0.1)
+  write.csv(pop.summary, file = fname, row.names = FALSE) 
+}

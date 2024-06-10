@@ -11,13 +11,18 @@ library(magick)
 
 ######### Make a static map of estiamted arrival time #########
 
-# read in the point data
-d <- read.csv(file = "out/spread-TCZ-timing.csv")
-# cast to sf
-d <- st_as_sf(d, coords = c("X", "Y"))
-# set the CRS (Australian Albers)
-d <- st_set_crs(d, 3577)
-d <- st_transform(d, 3857) # switch to web map default CRS
+
+read.point.data <- function(fname) {
+  # read in the point data
+  d <- read.csv(file = fname)
+  # cast to sf
+  d <- st_as_sf(d, coords = c("X", "Y"))
+  # set the CRS (Australian Albers)
+  d <- st_set_crs(d, 3577)
+  d <- st_transform(d, 3857) # switch to web map default CRS
+}
+
+d <- read.point.data("out/spread-TCZ-timing.csv")
 
 
 
@@ -52,17 +57,18 @@ tmap_save(p, filename = "out/year-of-arrival.pdf")
 
 ######### Make a dynamic map of estimated arrival time #########
 fpath <- "out/dynamic_maps/"
-mapYears <- sort(unique(d$arrival))
-for (yy in mapYears){
-  temp <- filter(d, arrival <= yy)
-  fname <- paste0(fpath, yy, ".png")
+input.flist <- list.files(path = fpath, pattern = ".csv")
+for (yy in input.flist){
+  temp <- read.point.data(fname = paste0(fpath, yy))
+  year.name <- gsub(".csv", "", yy)
+  fname <- paste0(fpath, year.name, ".png")
   p <- tm_shape(bm,
                 unit = "km") +
     tm_rgb() +
     tm_shape(temp) +
     tm_dots(size = 0.2,
-            col = "red") +
-    tm_layout(title = as.character(yy))
+            col = prob.colonised) +
+    tm_layout(title = year.name)
   tmap_save(p, filename = fname)
 }
 

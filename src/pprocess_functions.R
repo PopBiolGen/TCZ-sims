@@ -274,8 +274,8 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 # returns number of generations
 # target is a vector of rows of pop that contain targets
 spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list from pdist.fast  
-for (i in 1:gens){
-		#if (i%%5==0) output(pop, i, K)
+  trigger <- TRUE # to catch time to first arrival in pilbara
+  for (i in 1:gens){
 		occp <- pop[,"Pres"]==1 #which sites are occupied
 		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
 		gma <- sum(lambda_t_x) # total propagules at this time step
@@ -303,9 +303,14 @@ for (i in 1:gens){
 		occp <- pop[,"Pres"]==1 #which sites are occupied now
 		pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
 		if (plot==TRUE) plotter(pop, file.name=paste(i,".png", sep=""), gen=i)
-    if (sum(pop[pop[, "target"]==1,"Pres"])>0) break
+		test.condition <- sum(pop[pop[, "target"]==1,"Pres"]) # number of target sites occupied
+    if (test.condition > 0 && trigger) {
+      time.to.pilbara <- i #record time of arrival
+      trigger <- FALSE
+    }
+		if (test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
 	}
-	list(gen=i, popmatrix=pop)	
+	list(gen=time.to.pilbara, popmatrix=pop)	
 }
 
 # spreads the population over gens generations or until target sites are reached

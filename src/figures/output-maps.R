@@ -40,7 +40,7 @@ p <- tm_shape(bm,
   tm_shape(d) +
   tm_dots(size = 0.2,
           col = "arrival",
-          breaks = 2023:2042, 
+          breaks = 2024:2042, 
           legend.format = list(big.mark = ""),
           title = "Predicted year of toad arrival") 
 

@@ -20,7 +20,7 @@ setup(point.data = tczPoints,
       threshold = 50)
 
 
-######## how long to the pilbara (in wet seasons from dry season of 2023) ########
+######## how long to the pilbara (in wet seasons from dry season of 2024) ########
 reps <- 100
 output<-vector("list", length=reps) # vector to take outputs
 
@@ -49,7 +49,7 @@ summary(time.vec)
 add_index_column <- function(x, index) { # Function to add index column to each matrix
   mat <- x$popmatrix
   index_col <- rep(index, n = nrow(mat))
-  arrival <- round(2023+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
+  arrival <- round(2024+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
   cbind(index_col, mat, arrival)
 }
 # Apply the function to each element of the list using lapply
@@ -67,8 +67,9 @@ pop.summary <- pop.out %>%
 write.csv(pop.summary, file = "out/spread-TCZ-timing.csv", row.names = FALSE) 
 
 # to make a dynamic map...
-# for each year, 2023 to max(mean arrival time), generate a csv to plot, that reports probability of colonisation at that time for each waterpoint
-for (yy in 2023:max.time){
+# for each year, 2024 to max(mean arrival time), generate a csv to plot, that reports probability of colonisation at that time for each waterpoint
+max.time <- max(pop.summary$arrival)
+for (yy in 2024:max.time){
   fname <- paste0("out/dynamic_maps/", yy, ".csv")
   pop.summary <- pop.out %>%
     as.data.frame() %>%

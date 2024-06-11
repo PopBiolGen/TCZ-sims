@@ -126,7 +126,7 @@ make_plots <- function(scenario.name) {
               col = "prob.colonised",
               breaks = seq(0, 1, length.out = 5),
               title = "Probability of colonisation") +
-      tm_layout(title = year.name)
+      tm_layout(title = gsub("[^0-9]", "", year.name))
     tmap_save(p, filename = fname)
   }
   

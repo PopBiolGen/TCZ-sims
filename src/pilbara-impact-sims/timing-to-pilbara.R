@@ -50,7 +50,7 @@ summary(time.vec)
 # Work out mean time to and arrival year for each point
 
 add_index_column <- function(x, index) { # Function to add index column to each matrix
-  mat <- x$popmatrix
+  mat <- x$popmatrix[x$popmatrix[, "age"] > 0, ] # remove points never colonised
   index_col <- rep(index, n = nrow(mat))
   arrival <- round(2024+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
   cbind(index_col, mat, arrival)

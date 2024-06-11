@@ -76,17 +76,19 @@ make_plots <- function(scenario.name) {
     d <- st_transform(d, 3857) # switch to web map default CRS
   }
   
-  d <- read.point.data(paste0(in.name, ".csv"))
+  # just to define mapping extent (varies among scenarios, otherwise)
+  d <- read.point.data("out/basemap_points.csv")
   
-  
-  
-  # read a satellite image basemap from ESRI
+  # read a basemap in from ESRI
   bm <- read_osm(
     d,
     type = "osm", # for satellite image, "esri-imagery",
     zoom = 8,
     ext = 1
   )
+  
+  # replace with data to be mapped
+  d <- read.point.data(paste0(in.name, ".csv"))
   
   p <- tm_shape(bm,
                 unit = "km") +
@@ -98,7 +100,7 @@ make_plots <- function(scenario.name) {
             legend.format = list(big.mark = ""),
             title = "Predicted year of toad arrival") 
   
-  tmap_save(p, filename = paste0("out/year-of-arrival", scenario.name, ".pdf"))
+  tmap_save(p, filename = paste0("out/year-of-arrival_", scenario.name, ".pdf"))
   
   # other options for plotting
   # ggplot() +
@@ -131,7 +133,7 @@ make_plots <- function(scenario.name) {
   flist <- list.files(path = fpath, pattern = ".png")
   images <- image_read(paste0(fpath, flist))
   animation <- image_animate(images, fps = 1)
-  image_write(animation, path = paste0("out/dynamic_maps/animated_map", scenario.name, ".gif"))
+  image_write(animation, path = paste0("out/dynamic_maps/animated-map_", scenario.name, ".gif"))
   
   # clean up
   file.remove(paste0(fpath, input.flist))
@@ -251,11 +253,11 @@ run_sims <- function(scenario.name, n.sims = 100) {
   
   time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
   
-  pdf(file = paste0(out.name, ".pdf"))
-  hist(time.vec, xlab = "Time to the Pilbara (y)")
-  dev.off()
-  
-  summary(time.vec)
+  if (sum(is.finite(time.vec))>0) {
+    pdf(file = paste0(out.name, ".pdf"))
+      hist(time.vec, xlab = "Time to the Pilbara (y)")
+    dev.off()
+  }
   
   # Work out mean time to and arrival year for each point
   
@@ -342,14 +344,17 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   remove_duplicates = TRUE,
                   threshold = 100, # metres within which to filter out duplicates
                   constant.rain = NULL, # else number of days you want across whole area 
-                  trunc.dist = NULL # else the distance in m at which to truncate the kernel
+                  trunc.dist = NULL, # else the distance in m at which to truncate the kernel
+                  TCZ = FALSE # implement the TCZ, or not?
                   ){
   load("dat/Kernel_fits.RData")
   if (is.object(point.data)) { 
     pData <- point.data
   } else {
-      pData<-read.csv(point.data)
+      pData <- read.csv(point.data)
     }
+  
+  if (TCZ) pData <- subset(pData, !(pData[["TCZ"]] == 1 & pData[[artificial.natural.id]] == 0))
   
   load("dat/Posteriors.RData")
   #get matrix for the 'spread' function
@@ -401,6 +406,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 # target is a vector of rows of pop that contain targets
 spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list from pdist.fast  
   trigger <- TRUE # to catch time to first arrival in pilbara
+  time.to.pilbara <- NA
   for (i in 1:gens){
 		occp <- pop[,"Pres"]==1 #which sites are occupied
 		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t

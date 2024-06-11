@@ -1,3 +1,9 @@
+library(sf)
+library(tmap)
+library(tmaptools)
+library(magick)
+library(dplyr)
+
 #The kernel
 dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
   (x*u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi*x)
@@ -54,6 +60,86 @@ knock.out.path<-function(pdist.list, point, n.points=2, natural){
   if (is.null(temp)) return(NULL)
   lapply(pdist.list, function(x) {subset(x, !x[,1]%in%temp)}) # and remove them from everywhere in the list
 }
+
+# function to make plots based on a scenario name
+make_plots <- function(scenario.name) {
+  in.name <- paste0("out/timing-to-pilbara_", scenario.name) # get filename for scenario
+  ######### Make a static map of estimated arrival time #########
+  # function to read point data (in Albers) and cast to sf with a CRS
+  read.point.data <- function(fname) {
+    # read in the point data
+    d <- read.csv(file = fname)
+    # cast to sf
+    d <- st_as_sf(d, coords = c("X", "Y"))
+    # set the CRS (Australian Albers)
+    d <- st_set_crs(d, 3577)
+    d <- st_transform(d, 3857) # switch to web map default CRS
+  }
+  
+  # just to define mapping extent (varies among scenarios, otherwise)
+  d <- read.point.data("out/basemap_points.csv")
+  
+  # read a basemap in from ESRI
+  bm <- read_osm(
+    d,
+    type = "osm", # for satellite image, "esri-imagery",
+    zoom = 8,
+    ext = 1
+  )
+  
+  # replace with data to be mapped
+  d <- read.point.data(paste0(in.name, ".csv"))
+  
+  p <- tm_shape(bm,
+                unit = "km") +
+    tm_rgb() +
+    tm_shape(d) +
+    tm_dots(size = 0.2,
+            col = "arrival",
+            breaks = 2024:2042, 
+            legend.format = list(big.mark = ""),
+            title = "Predicted year of toad arrival") 
+  
+  tmap_save(p, filename = paste0("out/year-of-arrival_", scenario.name, ".pdf"))
+  
+  # other options for plotting
+  # ggplot() +
+  #   stars::geom_stars()
+  # 
+  # terra::rast(bm)
+  # 
+  # ggplot() +
+  #   geom_spatraster
+  
+  ######### Make a dynamic map of estimated arrival time #########
+  fpath <- "out/dynamic_maps/"
+  input.flist <- list.files(path = fpath, pattern = ".csv")
+  for (yy in input.flist){
+    temp <- read.point.data(fname = paste0(fpath, yy))
+    year.name <- gsub(".csv", "", yy)
+    fname <- paste0(fpath, year.name, ".png")
+    p <- tm_shape(bm,
+                  unit = "km") +
+      tm_rgb() +
+      tm_shape(temp) +
+      tm_dots(size = 0.2,
+              col = "prob.colonised",
+              breaks = seq(0, 1, length.out = 5),
+              title = "Probability of colonisation") +
+      tm_layout(title = year.name)
+    tmap_save(p, filename = fname)
+  }
+  
+  flist <- list.files(path = fpath, pattern = ".png")
+  images <- image_read(paste0(fpath, flist))
+  animation <- image_animate(images, fps = 1)
+  image_write(animation, path = paste0("out/dynamic_maps/animated-map_", scenario.name, ".gif"))
+  
+  # clean up
+  file.remove(paste0(fpath, input.flist))
+  file.remove(paste0(fpath, flist))
+}
+
 
 # Approximate correction for pi*r2 calculation by the proportional overlap between waterbodies that are less than 2r distant from one another
 neigh.corr<-function(pairs, r){
@@ -145,6 +231,70 @@ remove_spatial_duplicates <- function(pop.mat, threshold){
   pop.mat[tooClose,]
 }
 
+# function that will run sims on whatever has been thrown into environment by setup()
+run_sims <- function(scenario.name, n.sims = 100) { 
+  ######## how long to the pilbara (in wet seasons from dry season of 2024) ########
+  output<-vector("list", length=n.sims) # vector to take outputs
+  
+  for (rr in 1:n.sims){ # for reps
+    cat("Rep ", rr, "\n")
+    lambda.samp<-10^rnorm(1, mean=sample.lambda, sd=sample.lambda.sd)
+    r.samp<-10^2
+    temp<-spread.pilb(pop=spread.table, gens=100, pairs=pairs, delta=lambda.samp, r=r.samp)
+    temp<-c(temp, list(pars=cbind(lambda=lambda.samp, r=r.samp)))
+    output[[rr]]<-temp
+  }
+  
+  ######## save output and generate summaries ########
+  # time to arrive in Pilbara
+  out.name <- paste0("out/timing-to-pilbara_", scenario.name) # make filename for scenario
+  
+  save(output, file = paste0(out.name, ".Rdata"))
+  
+  time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
+  
+  if (sum(is.finite(time.vec))>0) {
+    pdf(file = paste0(out.name, ".pdf"))
+      hist(time.vec, xlab = "Time to the Pilbara (y)")
+    dev.off()
+  }
+  
+  # Work out mean time to and arrival year for each point
+  
+  add_index_column <- function(x, index) { # Function to add index column to each matrix
+    mat <- x$popmatrix[x$popmatrix[, "age"] > 0, ] # remove points never colonised
+    index_col <- rep(index, n = nrow(mat))
+    arrival <- round(2024+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
+    cbind(index_col, mat, arrival)
+  }
+  # Apply the function to each element of the list using lapply
+  modified_matrices <- lapply(seq_along(output), function(i) {
+    add_index_column(output[[i]], i)
+  })
+  # bind the lot together into single matrix
+  pop.out <- do.call("rbind", modified_matrices)
+  
+  # get mean arrival time for each point, or making a static map
+  pop.summary <- pop.out %>% 
+    as.data.frame() %>%
+    group_by(ID) %>%
+    summarise_all(mean)
+  write.csv(pop.summary, file = paste0(out.name, ".csv"), row.names = FALSE) 
+  
+  # to make a dynamic map...
+  # for each year, 2024 to max(mean arrival time), generate a csv to plot, that reports probability of colonisation at that time for each waterpoint
+  max.time <- max(pop.summary$arrival) + 2
+  for (yy in 2024:max.time){
+    fname <- paste0("out/dynamic_maps/", scenario.name, "_", yy, ".csv")
+    pop.summary <- pop.out %>%
+      as.data.frame() %>%
+      group_by(ID) %>%
+      summarise(X = mean(X), Y = mean(Y), prob.colonised = mean(arrival <= yy)) %>%
+      filter(prob.colonised > 0.1)
+    write.csv(pop.summary, file = fname, row.names = FALSE) 
+  }
+}
+
 # spreads the population over gen generations, and compares predictions to observed spread
 spread<-function(pop, gens, pairs, delta, r, obs){ #pairs is a list from pdist.fast
   preds<-NULL	
@@ -194,14 +344,17 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   remove_duplicates = TRUE,
                   threshold = 100, # metres within which to filter out duplicates
                   constant.rain = NULL, # else number of days you want across whole area 
-                  trunc.dist = NULL # else the distance in m at which to truncate the kernel
+                  trunc.dist = NULL, # else the distance in m at which to truncate the kernel
+                  TCZ = FALSE # implement the TCZ, or not?
                   ){
   load("dat/Kernel_fits.RData")
   if (is.object(point.data)) { 
     pData <- point.data
   } else {
-      pData<-read.csv(point.data)
+      pData <- read.csv(point.data)
     }
+  
+  if (TCZ) pData <- subset(pData, !(pData[["TCZ"]] == 1 & pData[[artificial.natural.id]] == 0))
   
   load("dat/Posteriors.RData")
   #get matrix for the 'spread' function
@@ -253,6 +406,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 # target is a vector of rows of pop that contain targets
 spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list from pdist.fast  
   trigger <- TRUE # to catch time to first arrival in pilbara
+  time.to.pilbara <- NA
   for (i in 1:gens){
 		occp <- pop[,"Pres"]==1 #which sites are occupied
 		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t

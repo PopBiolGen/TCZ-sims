@@ -19,7 +19,7 @@ setup(point.data = tczPoints,
       rain.id = "daysRain_1",
       threshold = 50,
       constant.rain = 180,
-      trunc.dist = 80000)
+      trunc.dist = NULL)
 
 
 ######## how long to the pilbara (in wet seasons from dry season of 2024) ########

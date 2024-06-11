@@ -1,23 +1,7 @@
-#calculates density of X2, Y2 along line given by X1, Y1   
-density.line<-function(X1, Y1, X2, Y2, bw=bw.nrd(sqrt((X1[1]-X2)^2+(Y1[1]-Y2)^2)), adjust=1){
-  pdists<-vector(mode="list", length=length(X1))
-  pdens<-vector(mode="numeric", length=length(X1))
-  for (ii in 1:length(X1)){ 
-    pdists[[ii]]<-sqrt((X2-X1[ii])^2+(Y2-Y1[ii])^2)
-    pdens[ii]<-sum(dnorm(x=pdists[[ii]], mean=0, sd=bw*adjust))#/length(X2)
-  }
-  list(x=X1, y=pdens)
-}
-
 #The kernel
 dcncross<-function(x, u, v) {  #stuart's cauchy-normal distribution in 2D
   (x*u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi*x)
 } 
-
-#takes x, y, indices of a matrix and places them into a vector
-flatmat<-function(x, y, size){ #size is size of one side of matrix
-	(y-1)*size+x
-}
 
 # given a point in the pdist list, takes out that point and its n nearest neighbours from the
 #   pairwise distance list.  Returns modified list.
@@ -50,33 +34,6 @@ knock.out.path<-function(pdist.list, point, n.points=2, natural){
   lapply(pdist.list, function(x) {subset(x, !x[,1]%in%temp)}) # and remove them from everywhere in the list
 }
 
-
-neighbours.init<-function(space.size, cell.size){
-	lth<-space.size/cell.size
-	neigh<-array(0, dim=c(9,2,lth,lth))	
-	for (x in 1:lth){
-		for (y in 1:lth){
-			out<-matrix(nrow=9, ncol=2)
-			ifelse((x-1)==0, X<-NA, X<-x-1) #correct for indices going to zero
-			ifelse((y-1)==0, Y<-NA, Y<-y-1)
-			ifelse((y+1)>lth, Yp<-NA, Yp<-y+1) # correct for indices going to > space
-			ifelse((x+1)>lth, Xp<-NA, Xp<-x+1)
-			# Assign neighbours
-			out[1,]<-c(x, y) #record target cell
-			out[2,]<-c(Xp, y)
-			out[3,]<-c(X, y)
-			out[4,]<-c(x, Y)
-			out[5,]<-c(Xp, Y)	
-			out[6,]<-c(X, Y)
-			out[7,]<-c(x, Yp)
-			out[8,]<-c(Xp, Yp)
-			out[9,]<-c(X, Yp)
-			neigh[,,x,y]<-out
-		}	
-	}
-	neigh	#return the array
-}
-
 # Approximate correction for pi*r2 calculation by the proportional overlap between waterbodies that are less than 2r distant from one another
 neigh.corr<-function(pairs, r){
   #collect pairs less than 2r distant
@@ -100,17 +57,6 @@ obs_pred_cf<-function(preds, obs){
   temp<-temp[,"Pres"]==temp[,"OCCUPIED"]
   temp<-na.exclude(temp)
   sum(temp)
-}
-
-
-# outputs data.  With or without a plot as well.
-output<-function(pop, gen, id, plot=T){
-  dname<-paste(id, "pop", gen, ".txt", sep="")
-  write.table(pop, dname, sep="\t", row.names=F)
-  if (plot==T){
-    pname<-paste(id, "plot", gen, ".png", sep="")
-    plotter(pop, pname)
-  }	
 }
 
 output_val<-function(pop, gens){
@@ -225,7 +171,8 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   artificial.natural.id = "art_nat",
                   rain.id = "rain_1mm",
                   remove_duplicates = TRUE,
-                  threshold = 100
+                  threshold = 100, # metres within which to filter out duplicates
+                  constant.rain = NULL # else number of days you want across whole area 
                   ){
   load("dat/Kernel_fits.RData")
   if (is.object(point.data)) { 
@@ -249,11 +196,12 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   age <- Pres # set already colonised to age = 1
   nats <- pData[[artificial.natural.id]]==0
   
-  u <- (pData[[rain.id]]-1)/364
-  u <- 3*(u-u^2) + u^3
-  u <- pData[[rain.id]]+3*pData[[rain.id]]*(1-u)
-  u <- floor(u)
-  
+  if (is.null(constant.rain)){
+    u <- (pData[[rain.id]]-1)/364
+    u <- 3*(u-u^2) + u^3
+    u <- pData[[rain.id]]+3*pData[[rain.id]]*(1-u)
+    u <- floor(u)
+  }else {u <- rep(constant.rain, nrow(pData))}
   
   u<-fits[u,1:2]
   
@@ -311,53 +259,4 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list 
 		if (test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
 	}
 	list(gen=time.to.pilbara, popmatrix=pop)	
-}
-
-# spreads the population over gens generations or until target sites are reached
-# returns number of generations
-# target is a vector of rows of pop that contain targets
-# differs from previous versions of spread in that popmatrix has ndays of rain rather than U.
-#	u is calculated internally
-spread.pilb.varndays<-function(pop, gens, pairs, target, delta, r, plot=FALSE, fits, p.extreme, extreme.val){ #pairs is a list from pdist.fast  
-for (i in 1:gens){
-		#if (i%%5==0) output(pop, i, K)
-		occp<-subset(pop, pop[,"Pres"]==1) #collect occupied sites
-		occp<-cbind(occp, lambda=rpois(nrow(occp), delta))
-		gma<-sum(occp[,"lambda"])
-		potl<-pairs[occp[,"ID"]] #collect relevant parts of pair list
-		potl<-do.call("rbind", potl)
-		src.ID<-rep(occp[,"ID"], times=occp[,"n.pairs"])
-		potl<-cbind(src.ID, potl)
-		lambda<-rep(occp[,"lambda"], times=occp[,"n.pairs"])
-			relrain<-1+rbinom(1, 1, p.extreme)*extreme.val
-			ndays<-occp[,"ndays"]*relrain
-			U<-(ndays-1)/364
-			U<-3*(U-U^2) + U^3
-			U<-ndays+3*ndays*(1-U)
-			U<-floor(U)
-			U<-fits[U,1:2]
-			V<-rep(U[,2], times=occp[,"n.pairs"])
-			U<-rep(U[,1], times=occp[,"n.pairs"]) #expand source specific kernel parameters			
-		recruits<-lambda*dcncross(potl[,"dists"]+0.05, U, V) #calculate densities attributable to each pair
-		#browser()
-		recruits<-(pi*r^2*neigh.corr(pairs, r))/gma*tapply(recruits, potl[,"snk.ID"], sum) #sum densities from colonised waterbodies over all waterbodies and convert to proportion
-		failures<-1-sum(recruits)
-		if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
-		recruits<-c(recruits, failures) #add on the failures
-		recruit.ID<-as.integer(names(recruits)[-length(recruits)])
-		recruits<-rmultinom(1, gma, recruits)[-length(recruits)]
-		recruits<-cbind(recruit.ID, recruits)
-		recruits<-subset(recruits, recruits[,"recruits"]>2)
-		pop[match(recruits[,"recruit.ID"], pop[,"ID"]), "Pres"]<-1
-		pop[which(pop[,"Pres"]==1), "age"]<-1+pop[which(pop[,"Pres"]==1), "age"]
-		if (plot==TRUE) plotter(pop, file.name=paste(i,".png", sep=""), gen=i)
-    if (sum(pop[target,"Pres"])>0) break
-	}
-	list(gen=i, popmatrix=pop)	
-}
-
-# calculates the product of all elements in a vector
-vec.prod<-function(vec){
-  last<-length(vec)
-  cumprod(vec)[last]
 }

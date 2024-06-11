@@ -17,7 +17,8 @@ setup(point.data = tczPoints,
       present.id = "colonised",
       artificial.natural.id = "origin_des",
       rain.id = "daysRain_1",
-      threshold = 50)
+      threshold = 50,
+      constant.rain = 180)
 
 
 ######## how long to the pilbara (in wet seasons from dry season of 2024) ########
@@ -68,7 +69,7 @@ write.csv(pop.summary, file = "out/spread-TCZ-timing.csv", row.names = FALSE)
 
 # to make a dynamic map...
 # for each year, 2024 to max(mean arrival time), generate a csv to plot, that reports probability of colonisation at that time for each waterpoint
-max.time <- max(pop.summary$arrival)
+max.time <- max(pop.summary$arrival) + 2
 for (yy in 2024:max.time){
   fname <- paste0("out/dynamic_maps/", yy, ".csv")
   pop.summary <- pop.out %>%

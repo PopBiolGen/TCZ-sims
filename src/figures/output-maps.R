@@ -9,9 +9,8 @@ library(tmaptools)
 library(dplyr)
 library(magick)
 
-######### Make a static map of estiamted arrival time #########
-
-
+######### Make a static map of estimated arrival time #########
+# function to read point data (in Albers) and cast to sf with a CRS
 read.point.data <- function(fname) {
   # read in the point data
   d <- read.csv(file = fname)
@@ -78,3 +77,7 @@ flist <- list.files(path = fpath, pattern = ".png")
 images <- image_read(paste0(fpath, flist))
 animation <- image_animate(images, fps = 1)
 image_write(animation, path = "out/dynamic_maps/animated_map.gif")
+
+# clean up
+file.remove(paste0(fpath, input.flist))
+file.remove(paste0(fpath, flist))

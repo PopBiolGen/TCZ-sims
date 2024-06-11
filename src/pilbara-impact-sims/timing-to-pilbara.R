@@ -18,7 +18,8 @@ setup(point.data = tczPoints,
       artificial.natural.id = "origin_des",
       rain.id = "daysRain_1",
       threshold = 50,
-      constant.rain = 180)
+      constant.rain = 180,
+      trunc.dist = NULL)
 
 
 ######## how long to the pilbara (in wet seasons from dry season of 2024) ########
@@ -26,6 +27,7 @@ reps <- 100
 output<-vector("list", length=reps) # vector to take outputs
 
 for (rr in 1:reps){ # for reps
+  cat("Rep ", rr, "\n")
   lambda.samp<-10^rnorm(1, mean=sample.lambda, sd=sample.lambda.sd)
   r.samp<-10^2
   temp<-spread.pilb(pop=spread.table, gens=100, pairs=pairs, delta=lambda.samp, r=r.samp)
@@ -48,7 +50,7 @@ summary(time.vec)
 # Work out mean time to and arrival year for each point
 
 add_index_column <- function(x, index) { # Function to add index column to each matrix
-  mat <- x$popmatrix
+  mat <- x$popmatrix[x$popmatrix[, "age"] > 0, ] # remove points never colonised
   index_col <- rep(index, n = nrow(mat))
   arrival <- round(2024+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
   cbind(index_col, mat, arrival)
@@ -79,3 +81,6 @@ for (yy in 2024:max.time){
     filter(prob.colonised > 0.1)
   write.csv(pop.summary, file = fname, row.names = FALSE) 
 }
+
+# make figures
+source("src/figures/output-maps.R")

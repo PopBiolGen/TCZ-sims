@@ -6,7 +6,6 @@ library(ggplot2)
 library(sf)
 library(tmap)
 library(tmaptools)
-library(dplyr)
 library(magick)
 
 ######### Make a static map of estimated arrival time #########

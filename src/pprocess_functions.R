@@ -1,7 +1,28 @@
 #The kernel
-dcncross<-function(x, u, v) {  #stuart's cauchy-normal distribution in 2D
+dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
   (x*u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi*x)
 } 
+
+# Function to return the area under the curve at a given truncation distance for a vector of u, v
+kernel.truncation<-function(u, v, trunc.dist) {
+  area <- rep(NA,length(u))
+  for (ii in 1:length(u)) {
+    u1 <- u[ii]
+    v1 <- v[ii]
+    integrand <- function(x) {(x*u1^v1*v1*sqrt(v1^v1*(u1^2*v1+x^2)^(-2-v1)))} # 1D kernel
+    area[ii] <- integrate(integrand, lower = 0, upper = trunc.dist)$value
+  }
+  return(area)
+} 
+
+# returns probability density for a truncated kernel
+# Assumes trunc.area has been worked out using trunc.dist in kernel.truncation()
+dcncross.trunc <- function(x, u, v, trunc.dist, trunc.area){
+  if (is.null(trunc.dist)) return(dcncross(x, u, v))
+  density <- dcncross(x, u, v)/trunc.area
+  density[x > trunc.dist] <- 0
+  density
+}
 
 # given a point in the pdist list, takes out that point and its n nearest neighbours from the
 #   pairwise distance list.  Returns modified list.
@@ -172,7 +193,8 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   rain.id = "rain_1mm",
                   remove_duplicates = TRUE,
                   threshold = 100, # metres within which to filter out duplicates
-                  constant.rain = NULL # else number of days you want across whole area 
+                  constant.rain = NULL, # else number of days you want across whole area 
+                  trunc.dist = NULL # else the distance in m at which to truncate the kernel
                   ){
   load("dat/Kernel_fits.RData")
   if (is.object(point.data)) { 
@@ -196,6 +218,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   age <- Pres # set already colonised to age = 1
   nats <- pData[[artificial.natural.id]]==0
   
+  # assign kernel values to waterpoints
   if (is.null(constant.rain)){
     u <- (pData[[rain.id]]-1)/364
     u <- 3*(u-u^2) + u^3
@@ -203,7 +226,14 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
     u <- floor(u)
   }else {u <- rep(constant.rain, nrow(pData))}
   
-  u<-fits[u,1:2]
+  # setup for kernel truncation
+  if (!is.null(trunc.dist)){
+    trunc.area <- kernel.truncation(fits[,"u"], fits[,"v"], trunc.dist)
+  }else {trunc.area <- rep(1, nrow(fits))}
+  
+  fits <- cbind(fits, trunc.area)
+  
+  u<-fits[u, c("u", "v", "trunc.area")]
   
   spread.table <-  cbind(ID, X, Y, Pres, target, u, age, nats)
   
@@ -213,7 +243,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
   
-  outList <- list(spread.table = spread.table, pairs = pairs_pdist)
+  outList <- list(spread.table = spread.table, pairs = pairs_pdist, trunc.dist = trunc.dist)
   list2env(outList, envir = globalenv())
 }
 
@@ -230,9 +260,11 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list 
 		pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pair matrix
 		marg_dens <- apply(pairs_t, # get probability density accruing from each source
 		                   MARGIN = 2, 
-		                   FUN = dcncross, 
+		                   FUN = dcncross.trunc, 
 		                   u = pop[occp,"u"], 
-		                   v = pop[occp,"v"])
+		                   v = pop[occp,"v"],
+		                   trunc.area = pop[occp,"trunc.area"],
+		                   trunc.dist = trunc.dist)
 		marg_dens <- sweep(marg_dens, # make into toad density
 		                   MARGIN = 1, 
 		                   STATS = lambda_t_x, 

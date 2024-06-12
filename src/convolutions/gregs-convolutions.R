@@ -1,61 +1,55 @@
-setwd("~/Dropbox/Papers/Submitted/Artificial waterbodies/Data")
+source("src/convolutions/convolution-functions.R")
 
-source("convolution functions.R")
-
-library(MASS)
-library(adehabitat)
+#library(adehabitat)
+library(amt)
 
 ndays<-200 #days over which to convolve
 
 #load data and convert date to POSIXct
-d<-read.table("Gregs data.txt", header=T, sep="\t")
+d<-read.table("dat/gregsData.txt", header=T, sep="\t")
 d$date<-as.POSIXct(d$date*24*60*60, origin=as.Date("1904-1-1"))
-
-#convert to ltraj
 
 #Grab only data from Jan-March 2005/2006
 d<-subset(d, d$month<=3)
-#d<-subset(d, d$year<=2006)
 
-#convert to ltraj
-temp<-as.ltraj(d[,c(9, 8)], d$date, d$Toad.ID)
-temp2<-ltraj2traj(temp)
+# make into track object
+d.track <- d %>% make_track(.x = EW.UTM,  # make into track object
+                           .y = NS.UTM, 
+                           .t = date, 
+                           id = Toad.ID, 
+                           crs = 32752)
 
-# summ<-summary(temp)
-# mean(summ$date.end-summ$date.begin)/(60*60*24)
-# mean(summ$nb.reloc)
+# store individuals in column list format
+d.track.cl <- d.track %>% nest(data = -"id") 
 
-#grab dists and turn angles for simulating random walks
-out<-data.frame(as.character(temp2$id), temp2$dist, temp2$rel.angle)
-colnames(out)<-c("ID", "dist", "rel.angle")
+# create new data column, cast to steps, unlist and calculate step length per day
+d.steps <- d.track.cl %>% mutate(steps = map(data, steps)) %>% 
+                          unnest(steps) %>%
+                          mutate(sl.dt = sl_/as.numeric(dt_)*86400)
+
 
 # subset data and resample for each individual with more than 5 observations
 resamps<-c()
-for (i in 1: length(levels(out$ID))){
-	temp<-subset(out, out$ID==levels(out$ID)[i])
-	if (length(which(is.na(temp$rel.angle)==F))<5) next
-	sclr<-temp$dist[which(is.na(temp$dist)==F)]
-	rel.angle<-temp$rel.angle[which(is.na(temp$rel.angle)==F)]
+ids <- unique(d.steps$id)
+for (i in 1:length(ids)){
+	temp <- subset(d.steps, d.steps$id==ids[i])
+	if (sum(is.finite(temp$ta_))<5) next
+	sclr <- temp$sl.dt[is.finite(temp$sl.dt)]
+	ta_ <- temp$ta_[is.finite(temp$ta_)]
 	#simulate 1000 random walks by resampling dist and turn angle
-	temp2<-nday(sclr, ndays, rel.angle, 1000)
-	resamps<-rbind(resamps, temp2)
+	temp2 <- nday(sclr, ndays, ta_, 10000)
+	resamps <- rbind(resamps, temp2)
 }
 
-## Alternative resampling procedure that ignores individual differences
-#   out<-na.omit(out)
-#   sclr<-out$dist
-#   rel.angle<-out$rel.angle
-#   #simulate 1000 random walks by resampling dist and turn angle
-#   resamps<-nday(sclr, ndays, rel.angle, 100000)
+# hist(resamps[,ndays])
 
-#look at resulting kernel for ndays days of movement 
-hist(resamps[,ndays])
+max(resamps[,ndays]) # from 1 million resamps: 72284.66
 
 #save samples for ndays=1:208 (big file!)
-save(resamps, file="Greg's convolution resamples.RData")
+#save(resamps, file="Greg's convolution resamples.RData")
 
 #fit kernel
-fits<-nwise(resamps+0.05, init.v=1.5)
+#fits<-nwise(resamps+0.05, init.v=1.5)
 
-save(fits, file="Kernel_fits.RData")
+#save(fits, file="Kernel_fits.RData")
 

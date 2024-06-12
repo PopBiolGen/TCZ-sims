@@ -32,18 +32,19 @@ d.steps <- d.track.cl %>% mutate(steps = map(data, steps)) %>%
 resamps<-c()
 ids <- unique(d.steps$id)
 for (i in 1:length(ids)){
+  cat(i, "\n")
 	temp <- subset(d.steps, d.steps$id==ids[i])
 	if (sum(is.finite(temp$ta_))<5) next
 	sclr <- temp$sl.dt[is.finite(temp$sl.dt)]
 	ta_ <- temp$ta_[is.finite(temp$ta_)]
 	#simulate 1000 random walks by resampling dist and turn angle
-	temp2 <- nday(sclr, ndays, ta_, 10000)
+	temp2 <- nday(sclr, ndays, ta_, 40000)
 	resamps <- rbind(resamps, temp2)
 }
 
 # hist(resamps[,ndays])
 
-max(resamps[,ndays]) # from 1 million resamps: 72284.66
+max(resamps[,ndays]) # from 4 million resamps: 72921.38
 
 #save samples for ndays=1:208 (big file!)
 #save(resamps, file="Greg's convolution resamples.RData")

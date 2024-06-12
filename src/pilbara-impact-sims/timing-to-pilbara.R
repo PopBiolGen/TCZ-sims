@@ -18,7 +18,7 @@ setup(point.data = tczPoints,
       rain.id = "daysRain_1",
       threshold = 50,
       constant.rain = 180,
-      trunc.dist = NULL,
+      trunc.dist = 80000,
       TCZ = FALSE)
 
 run_sims(scen.name)
@@ -50,7 +50,7 @@ setup(point.data = tczPoints,
       rain.id = "daysRain_1",
       threshold = 50,
       constant.rain = 180,
-      trunc.dist = NULL,
+      trunc.dist = 80000,
       TCZ = TRUE)
 
 run_sims(scen.name)

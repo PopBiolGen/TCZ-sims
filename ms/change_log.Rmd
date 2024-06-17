@@ -1,0 +1,29 @@
+---
+title: "Catalogue of changes from Tingley et al 2013"
+output: html_notebook
+---
+
+## Switch from cell-based truncation to kernel-based truncation
+
+Legacy code utilised a complicated process for matching pairs, by placing 100km grid over the landscape and only calculating pairwise interactions for location $i$ by examining the set of other sites, $j$ that were in $i$'s cell or neighbouring cells. This was done at the time to improve computation time, but also placed some structural truncation on dispersal distance.
+
+We switched this to calculating interactions across the full pairwise distance matrix (which runs a lot faster in 2024 R), which considerably simplifies the code.
+
+The $t$-distributions used for kernels have quite fat tails, so very long distance dispersal is possible.  Under the revised code structure, this led to occasional very long distance dispersal events (i.e. toads might hop 300km in a wet season, which is clearly not possible).  We needed to truncate the tails of the dispersal kernel.  
+
+While truncation is straightforward, it is not clear what distance to truncate at.  To resolve this, we went back to the resampling procedure used in the 2013 paper. The idea being to resample a large number of movement trajectories, and use the upper limit of these resamples (+10%) as a hard upper limit on the kernel (i.e. as the truncation distance for the kernel).  We initially looked for the maximum distance a toad might move over 200 days and applied this as the upper limit for all kernels, but realised it made more sense to make this calculation for each ndays of movement.  So each kernel has its own truncation distance, estimated from the data. The `adehabitat` library had also been deprecated, so we needed to update to use the `amt` library.  
+
+In implementing the truncation, we undertake the intensive part of that procedure (integration of the kernel) once, during resampling and kernel parameter calculation.  Outputs are then passed to the spread model and used by a truncated kernel function. Splitting the work in this way speeds up the application of the truncated kernel function during model run time.
+
+The revised model now has no structural limit on dispersal distance, but does now place a natural limit on toad dispersal, as estimated during the resampling process.
+
+## Structural re-organisation
+
+We have moved the setup process to its own function, and now only use a single spread and setup function, with arguments that allow customised behaviour of spread function and population setup.  This simplifies the code required to run various scenarios.
+
+The spatial plotting was broken with the loss of `RGDAL` and `Dismo` functionality.  We  have updated spatial plotting to utilise today's spatial libraries and plotting functions, which are much nicer to use.  Again, now implemented as built in functions.
+
+We have made the function mapping number of days of rain to number of days of movement into its own function.
+
+
+

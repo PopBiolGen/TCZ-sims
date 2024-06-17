@@ -9,18 +9,6 @@ dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
   (x*u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi*x)
 } 
 
-# Function to return the area under the curve at a given truncation distance for a vector of u, v
-kernel.truncation<-function(u, v, trunc.dist) {
-  area <- rep(NA,length(u))
-  for (ii in 1:length(u)) {
-    u1 <- u[ii]
-    v1 <- v[ii]
-    integrand <- function(x) {(x*u1^v1*v1*sqrt(v1^v1*(u1^2*v1+x^2)^(-2-v1)))} # 1D kernel
-    area[ii] <- integrate(integrand, lower = 0, upper = trunc.dist)$value
-  }
-  return(area)
-} 
-
 # returns probability density for a truncated kernel
 # Assumes trunc.area has been worked out using trunc.dist in kernel.truncation()
 dcncross.trunc <- function(x, u, v, trunc.dist, trunc.area){

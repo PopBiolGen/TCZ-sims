@@ -23,7 +23,7 @@ We have moved the setup process to its own function, and now only use a single s
 
 The spatial plotting was broken with the loss of `RGDAL` and `Dismo` functionality.  We  have updated spatial plotting to utilise today's spatial libraries and plotting functions, which are much nicer to use.  Again, now implemented as built in functions.
 
-We have made the function mapping number of days of rain to number of days of movement into its own function.
+We have made the function mapping number of days of rain to number of days of movement into its own function.  In doing so we also allowed the number of days movement per day of rain to vary: this precipitated expressing the function as an intersection of probabilities, rather than a union, as it was before.
 
 
 

@@ -2,8 +2,9 @@ source("src/convolutions/convolution-functions.R")
 
 #library(adehabitat)
 library(amt)
+library(dplyr)
 
-ndays<-200 #days over which to convolve
+ndays<-250 #days over which to convolve
 
 #load data and convert date to POSIXct
 d<-read.table("dat/gregsData.txt", header=T, sep="\t")
@@ -38,19 +39,24 @@ for (i in 1:length(ids)){
 	sclr <- temp$sl.dt[is.finite(temp$sl.dt)]
 	ta_ <- temp$ta_[is.finite(temp$ta_)]
 	#simulate 1000 random walks by resampling dist and turn angle
-	temp2 <- nday(sclr, ndays, ta_, 40000)
+	temp2 <- nday(sclr, ndays, ta_, 10000)
 	resamps <- rbind(resamps, temp2)
 }
 
-# hist(resamps[,ndays])
+nrow(resamps)
+max.dist <- apply(resamps, 2, max) # maximum from each resampling of number of steps
+max.dist <- max.dist * 1.1 # increase by 10% on resampled limit
 
-max(resamps[,ndays]) # from 4 million resamps: 72921.38
+# fit kernels 
+fits<-nwise(resamps+0.05, init.v=1.5)
 
-#save samples for ndays=1:208 (big file!)
-#save(resamps, file="Greg's convolution resamples.RData")
+# cbind with truncation distance
+fits <- cbind(fits[, !grepl(pattern = "LL", colnames(fits))], max.dist = max.dist)
 
-#fit kernel
-#fits<-nwise(resamps+0.05, init.v=1.5)
+# add area correction for truncation
+fits <- cbind(fits, area = kernel.truncation(u = fits[,"u"], v = fits[,"v"], trunc.dist = fits[,"max.dist"]))
 
-#save(fits, file="Kernel_fits.RData")
+
+
+save(fits, file="Kernel-fits_truncated.RData")
 

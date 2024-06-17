@@ -58,5 +58,5 @@ fits <- cbind(fits, area = kernel.truncation(u = fits[,"u"], v = fits[,"v"], tru
 
 
 
-save(fits, file="Kernel-fits_truncated.RData")
+save(fits, file="dat/Kernel-fits_truncated.RData")
 

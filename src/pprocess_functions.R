@@ -345,10 +345,10 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   remove_duplicates = TRUE,
                   threshold = 100, # metres within which to filter out duplicates
                   constant.rain = NULL, # else number of days you want across whole area 
-                  trunc.dist = NULL, # else the distance in m at which to truncate the kernel
+                  trunc.dist = TRUE, # false for full kernel
                   TCZ = FALSE # implement the TCZ, or not?
                   ){
-  load("dat/Kernel_fits.RData")
+  load("dat/Kernel-fits_truncated.RData")
   if (is.object(point.data)) { 
     pData <- point.data
   } else {
@@ -377,14 +377,8 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
     u <- rain_to_days(pData[[rain.id]])
   }else {u <- rep(constant.rain, nrow(pData))}
   
-  # setup for kernel truncation
-  if (!is.null(trunc.dist)){
-    trunc.area <- kernel.truncation(fits[,"u"], fits[,"v"], trunc.dist)
-  }else {trunc.area <- rep(1, nrow(fits))}
-  
-  fits <- cbind(fits, trunc.area)
-  
-  u<-fits[u, c("u", "v", "trunc.area")]
+  u<-fits[u, c("u", "v", "max.dist", "area")]
+  if (!trunc.dist) u[, "max.dist"] <- NULL # to switch to infinite positive bounds on kernel
   
   spread.table <-  cbind(ID, X, Y, Pres, target, u, age, nats)
   
@@ -394,7 +388,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
   
-  outList <- list(spread.table = spread.table, pairs = pairs_pdist, trunc.dist = trunc.dist)
+  outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   list2env(outList, envir = globalenv())
 }
 
@@ -415,8 +409,8 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list 
 		                   FUN = dcncross.trunc, 
 		                   u = pop[occp,"u"], 
 		                   v = pop[occp,"v"],
-		                   trunc.area = pop[occp,"trunc.area"],
-		                   trunc.dist = trunc.dist)
+		                   trunc.area = pop[occp,"area"],
+		                   trunc.dist = pop[occp,"max.dist"])
 		marg_dens <- sweep(marg_dens, # make into toad density
 		                   MARGIN = 1, 
 		                   STATS = lambda_t_x, 

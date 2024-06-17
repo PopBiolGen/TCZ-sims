@@ -9,18 +9,6 @@ dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
   (x*u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi*x)
 } 
 
-# Function to return the area under the curve at a given truncation distance for a vector of u, v
-kernel.truncation<-function(u, v, trunc.dist) {
-  area <- rep(NA,length(u))
-  for (ii in 1:length(u)) {
-    u1 <- u[ii]
-    v1 <- v[ii]
-    integrand <- function(x) {(x*u1^v1*v1*sqrt(v1^v1*(u1^2*v1+x^2)^(-2-v1)))} # 1D kernel
-    area[ii] <- integrate(integrand, lower = 0, upper = trunc.dist)$value
-  }
-  return(area)
-} 
-
 # returns probability density for a truncated kernel
 # Assumes trunc.area has been worked out using trunc.dist in kernel.truncation()
 dcncross.trunc <- function(x, u, v, trunc.dist, trunc.area){
@@ -217,6 +205,19 @@ plotter<-function(popmatrix, file.name="temp.png", gen){
   dev.off()
 }
 
+# function mapping days of rain to days of movement
+rain_to_days <- function(rain.days, days.per.rain = 4){
+  days <- function(r.d){
+    denom <- 365:(365-(r.d-1))
+    p.no.move <- 1-days.per.rain/denom
+    p.no.move <- prod(p.no.move)
+    p.move <- 1 - p.no.move
+    days <- p.move * 365
+    round(days)
+  }
+  sapply(rain.days, days)
+}
+
 # Finds points closer than threshold distance apart and removes one of the points
 # returns a filtered population table
 # to be used before creation of the spread table.
@@ -344,10 +345,10 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   remove_duplicates = TRUE,
                   threshold = 100, # metres within which to filter out duplicates
                   constant.rain = NULL, # else number of days you want across whole area 
-                  trunc.dist = NULL, # else the distance in m at which to truncate the kernel
+                  trunc.dist = TRUE, # false for full kernel
                   TCZ = FALSE # implement the TCZ, or not?
                   ){
-  load("dat/Kernel_fits.RData")
+  load("dat/Kernel-fits_truncated.RData")
   if (is.object(point.data)) { 
     pData <- point.data
   } else {
@@ -373,20 +374,11 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   # assign kernel values to waterpoints
   if (is.null(constant.rain)){
-    u <- (pData[[rain.id]]-1)/364
-    u <- 3*(u-u^2) + u^3
-    u <- pData[[rain.id]]+3*pData[[rain.id]]*(1-u)
-    u <- floor(u)
+    u <- rain_to_days(pData[[rain.id]])
   }else {u <- rep(constant.rain, nrow(pData))}
   
-  # setup for kernel truncation
-  if (!is.null(trunc.dist)){
-    trunc.area <- kernel.truncation(fits[,"u"], fits[,"v"], trunc.dist)
-  }else {trunc.area <- rep(1, nrow(fits))}
-  
-  fits <- cbind(fits, trunc.area)
-  
-  u<-fits[u, c("u", "v", "trunc.area")]
+  u<-fits[u, c("u", "v", "max.dist", "area")]
+  if (!trunc.dist) u[, "max.dist"] <- NULL # to switch to infinite positive bounds on kernel
   
   spread.table <-  cbind(ID, X, Y, Pres, target, u, age, nats)
   
@@ -396,7 +388,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
   
-  outList <- list(spread.table = spread.table, pairs = pairs_pdist, trunc.dist = trunc.dist)
+  outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   list2env(outList, envir = globalenv())
 }
 
@@ -417,8 +409,8 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list 
 		                   FUN = dcncross.trunc, 
 		                   u = pop[occp,"u"], 
 		                   v = pop[occp,"v"],
-		                   trunc.area = pop[occp,"trunc.area"],
-		                   trunc.dist = trunc.dist)
+		                   trunc.area = pop[occp,"area"],
+		                   trunc.dist = pop[occp,"max.dist"])
 		marg_dens <- sweep(marg_dens, # make into toad density
 		                   MARGIN = 1, 
 		                   STATS = lambda_t_x, 

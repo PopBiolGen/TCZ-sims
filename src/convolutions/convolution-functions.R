@@ -33,6 +33,18 @@ collapse_gaus<-function(x, u) {
 	(exp(-x^2/(2*u^2))/(2*pi*u^2))*(2*pi*x)
 }
 
+# Function to return the area under the curve at a given truncation distance for a vector of u, v
+kernel.truncation<-function(u, v, trunc.dist) {
+  area <- rep(NA,length(u))
+  for (ii in 1:length(u)) {
+    u1 <- u[ii]
+    v1 <- v[ii]
+    td1 <- trunc.dist[ii]
+    integrand <- function(x) {(x*u1^v1*v1*sqrt(v1^v1*(u1^2*v1+x^2)^(-2-v1)))} # 1D kernel
+    area[ii] <- integrate(integrand, lower = 0, upper = td1)$value
+  }
+  return(area)
+} 
 
 # fits collapse to resamples of data from nday
 nwise<-function(d.dists, init.v){

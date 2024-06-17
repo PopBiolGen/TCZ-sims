@@ -217,6 +217,19 @@ plotter<-function(popmatrix, file.name="temp.png", gen){
   dev.off()
 }
 
+# function mapping days of rain to days of movement
+rain_to_days <- function(rain.days, days.per.rain = 4){
+  days <- function(r.d){
+    denom <- 365:(365-(r.d-1))
+    p.no.move <- 1-days.per.rain/denom
+    p.no.move <- prod(p.no.move)
+    p.move <- 1 - p.no.move
+    days <- p.move * 365
+    round(days)
+  }
+  sapply(rain.days, days)
+}
+
 # Finds points closer than threshold distance apart and removes one of the points
 # returns a filtered population table
 # to be used before creation of the spread table.
@@ -373,10 +386,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   # assign kernel values to waterpoints
   if (is.null(constant.rain)){
-    u <- (pData[[rain.id]]-1)/364
-    u <- 3*(u-u^2) + u^3
-    u <- pData[[rain.id]]+3*pData[[rain.id]]*(1-u)
-    u <- floor(u)
+    u <- rain_to_days(pData[[rain.id]])
   }else {u <- rep(constant.rain, nrow(pData))}
   
   # setup for kernel truncation

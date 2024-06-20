@@ -228,6 +228,7 @@ remove_spatial_duplicates <- function(pop.mat, threshold){
   pDists[lower.tri(pDists, diag = TRUE)] <- threshold # set relevant parts to >threshold
   below_threshold <- function(x){x < threshold} 
   tooClose <- apply(pDists, MARGIN = 1, FUN = below_threshold) # matrix
+  rm(pDists) # free up memory (useful for large pDist matrices)
   tooClose <- apply(tooClose, 2, FUN = sum) == 0 # colsums == 0
   pop.mat[tooClose,]
 }
@@ -348,7 +349,10 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   trunc.dist = TRUE, # false for full kernel
                   TCZ = FALSE # implement the TCZ, or not?
                   ){
+  cat("Loading kernel parameters...\n")
   load("dat/Kernel-fits_truncated.RData")
+  
+  cat("Loading point data...\n")
   if (is.object(point.data)) { 
     pData <- point.data
   } else {
@@ -357,21 +361,11 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   if (TCZ) pData <- subset(pData, !(pData[["TCZ"]] == 1 & pData[[artificial.natural.id]] == 0))
   
+  cat("Loading posterior estimates...\n")
   load("dat/Posteriors.RData")
-  #get matrix for the 'spread' function
-  # need matrix containing:
-  # "ID, X, Y, Pres (0s), n.pairs, u (rainy days*85.35[which is estimate of u]), 
-  # age (0s)"
   
-  ID <- 1:nrow(pData)
-  X <- pData[[X.id]]
-  Y <- pData[[Y.id]]
-  Pres <- pData[[present.id]]
-  target <- Pres==2
-  Pres[Pres==2] <- 0
-  age <- Pres # set already colonised to age = 1
-  nats <- pData[[artificial.natural.id]]==0
   
+  cat("Assigning kernel parameters to waterpoints...\n")
   # assign kernel values to waterpoints
   if (is.null(constant.rain)){
     u <- rain_to_days(pData[[rain.id]])
@@ -380,15 +374,30 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   u<-fits[u, c("u", "v", "max.dist", "area")]
   if (!trunc.dist) u[, "max.dist"] <- NULL # to switch to infinite positive bounds on kernel
   
-  spread.table <-  cbind(ID, X, Y, Pres, target, u, age, nats)
+  cat("Building spread table...\n")
   
+  tg <- pData[[present.id]]==2 # identify target sites
+  pData[[present.id]][pData[[present.id]]==2] <- 0 # re-set targetted sites to 0
+  
+  spread.table <-  cbind(ID = 1:nrow(pData),
+                         X = pData[[X.id]],
+                         Y = pData[[Y.id]],
+                         target = tg,
+                         u = u,
+                         Pres = pData[[present.id]], # replace 2 from target with 0
+                         age = pData[[present.id]], # set already colonised to age = 1
+                         nats = pData[[artificial.natural.id]]==0)
+  
+  cat("Removing duplicates from spread table...\n")
   if (remove_duplicates) {
     spread.table <- remove_spatial_duplicates(spread.table, threshold)
   }
   
+  cat("Calculating pairwise distance matrix...\n")
   pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
   
   outList <- list(spread.table = spread.table, pairs = pairs_pdist)
+  cat("Placing spread table and pairwise distance matrix in: ")
   list2env(outList, envir = globalenv())
 }
 

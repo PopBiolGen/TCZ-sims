@@ -219,18 +219,22 @@ rain_to_days <- function(rain.days, days.per.rain = 4){
 }
 
 # Finds points closer than threshold distance apart and removes one of the points
-# returns a filtered population table
-# to be used before creation of the spread table.
+# returns a filtered population table, and a filtered pairwise distance table
 remove_spatial_duplicates <- function(pop.mat, threshold){
   X <- pop.mat[,"X"]
   Y <- pop.mat[, "Y"]
-  pDists <- pdist(X, Y) # get pairwise distances
-  pDists[lower.tri(pDists, diag = TRUE)] <- threshold # set relevant parts to >threshold
+  outList <- vector(mode = "list", length = 2) #list to take outputs
+  cat("Calculating pairwise distance matrix...\n")
+  outList[[1]] <- pdist(X, Y) # get pairwise distances
+  cat("Removing duplicates from tables...\n")
+  outList[[1]][lower.tri(outList[[1]], diag = TRUE)] <- threshold # set relevant parts to >threshold
   below_threshold <- function(x){x < threshold} 
-  tooClose <- apply(pDists, MARGIN = 1, FUN = below_threshold) # matrix
-  rm(pDists) # free up memory (useful for large pDist matrices)
+  tooClose <- apply(outList[[1]], MARGIN = 1, FUN = below_threshold) # matrix
   tooClose <- apply(tooClose, 2, FUN = sum) == 0 # colsums == 0
-  pop.mat[tooClose,]
+  outList[[1]] <- outList[[1]][tooClose, tooClose] #subset pairwise matrix
+  outList[[2]] <- pop.mat[tooClose,]
+  names(outList) <- c("pairs_pdist", "spread.table")
+  outList
 }
 
 # function that will run sims on whatever has been thrown into environment by setup()
@@ -388,15 +392,16 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                          age = pData[[present.id]], # set already colonised to age = 1
                          nats = pData[[artificial.natural.id]]==0)
   
-  cat("Removing duplicates from spread table...\n")
+  
   if (remove_duplicates) {
-    spread.table <- remove_spatial_duplicates(spread.table, threshold)
+    outList <- remove_spatial_duplicates(spread.table, threshold)
+  }else {
+    cat("Calculating pairwise distance matrix...\n")
+    pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
+    
+    outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   }
   
-  cat("Calculating pairwise distance matrix...\n")
-  pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
-  
-  outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   cat("Placing spread table and pairwise distance matrix in: ")
   list2env(outList, envir = globalenv())
 }

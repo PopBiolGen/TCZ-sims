@@ -387,6 +387,8 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is a list from pdist.fast  
   trigger <- TRUE # to catch time to first arrival in pilbara
   time.to.target <- NA
+  # A progress bar
+  pb <- txtProgressBar(min = 0, max = gens, style = 3)
   for (i in 1:gens){
 		#which sites are occupied
 		if (rollup) {
@@ -431,7 +433,9 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
       time.to.target <- i #record time of arrival
       trigger <- FALSE
     }
-		if (test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
-	}
+		if (test.condition > 0 & test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
+		setTxtProgressBar(pb, i)
+  }
+  close(pb) # close progress bar
 	list(gen=time.to.target, popmatrix=pop)	
 }

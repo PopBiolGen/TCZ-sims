@@ -10,7 +10,7 @@ dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
 } 
 
 # returns probability density for a truncated kernel
-# Assumes trunc.area has been worked out using trunc.dist in kernel.truncation()
+# Assumes trunc.area has been worked out during kernel fitting
 dcncross.trunc <- function(x, u, v, trunc.dist, trunc.area){
   if (is.null(trunc.dist)) return(dcncross(x, u, v))
   density <- dcncross(x, u, v)/trunc.area
@@ -242,7 +242,6 @@ remove_spatial_duplicates <- function(pop.mat, threshold){
 
 # function that will run sims on whatever has been thrown into environment by setup()
 run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) { 
-  ######## how long to the pilbara (in wet seasons from dry season of 2024) ########
   output<-vector("list", length=n.sims) # vector to take outputs
   
   for (rr in 1:n.sims){ # for reps
@@ -256,16 +255,15 @@ run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) {
 output
 }
 
-save_outputs <- function(output, path, scenario.name, start.year){
+save_outputs <- function(output, path, scenario.name, start.year, plot.time = FALSE, ABC = FALSE){
   ######## save output and generate summaries ########
-  # time to arrive in Pilbara
+  # time to arrive at target
   out.name <- paste0(path, "/", scenario.name) # make filename for scenario
   
-  save(output, file = paste0(out.name, ".Rdata"))
+  #save(output, file = paste0(out.name, ".Rdata"))
   
   time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
-  
-  if (sum(is.finite(time.vec))>0) {
+  if (plot.time & sum(is.finite(time.vec))>0) {
     pdf(file = paste0(out.name, ".pdf"))
       hist(time.vec, xlab = "Time to the Pilbara (y)")
     dev.off()
@@ -286,7 +284,12 @@ save_outputs <- function(output, path, scenario.name, start.year){
   # bind the lot together into single matrix
   pop.out <- do.call("rbind", modified_matrices)
   
-  # get mean arrival time for each point, or making a static map
+  if (ABC) {
+    save(pop.out, file = paste0(out.name, ".RData"))
+    return()
+  }
+  
+  # get mean arrival time for each point, for making a static map
   pop.summary <- pop.out %>% 
     as.data.frame() %>%
     group_by(ID) %>%
@@ -316,6 +319,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   present.id = "ARRIVE_MCP",
                   artificial.natural.id = "art_nat",
                   rain.id = "rain_1mm",
+                  observations = NULL,
                   remove_duplicates = TRUE,
                   threshold = 100, # metres within which to filter out duplicates
                   constant.rain = NULL, # else number of days you want across whole area 
@@ -359,7 +363,8 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                          u = u,
                          Pres = pData[[present.id]], # replace 2 from target with 0
                          age = pData[[present.id]], # set already colonised to age = 1
-                         nats = pData[[artificial.natural.id]]==0)
+                         nats = as.numeric(pData[[artificial.natural.id]]==0),
+                         obs = as.matrix(pData[observations])) # does nothing if NULL, else vector of column names
   
   
   if (remove_duplicates) {

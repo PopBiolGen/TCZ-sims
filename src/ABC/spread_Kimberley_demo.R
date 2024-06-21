@@ -20,7 +20,7 @@ setup(point.data = k.points,
       present.id = "colonised",
       artificial.natural.id = "origin_des",
       rain.id = "ndays_1",
-      threshold = 50,
+      threshold = 100,
       constant.rain = NULL,
       trunc.dist = TRUE,
       TCZ = FALSE)
@@ -30,5 +30,8 @@ gc()
 
 # make a target
 spread.table[spread.table[,"X"] == min(spread.table[,"X"]), "target"] <- 1
+save(spread.table, pairs_pdist, file = "out/setup_kimberley.RData")
 
-system.time( temp <- run_sims(n.sims = 1, plot = TRUE))
+
+
+system.time( temp <- run_sims(n.sims = 1, gens = 14, plot = TRUE, rollup = TRUE))

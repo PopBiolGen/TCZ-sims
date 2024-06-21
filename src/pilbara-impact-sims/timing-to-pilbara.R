@@ -21,7 +21,8 @@ setup(point.data = tczPoints,
       trunc.dist = TRUE,
       TCZ = FALSE)
 
-run_sims(scen.name)
+sim_out <- run_sims()
+save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2024)
 make_plots(scen.name)
 
 ######## likely case scenario ########
@@ -37,7 +38,8 @@ setup(point.data = tczPoints,
       trunc.dist = TRUE,
       TCZ = FALSE)
 
-run_sims(scen.name)
+sim_out <- run_sims()
+save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2024)
 make_plots(scen.name)
 
 ######## worst case scenario, but with TCZ ########
@@ -53,7 +55,8 @@ setup(point.data = tczPoints,
       trunc.dist = TRUE,
       TCZ = TRUE)
 
-run_sims(scen.name)
+sim_out <- run_sims()
+save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2024)
 make_plots(scen.name)
 
 ######## likely scenario, but with TCZ ########
@@ -69,5 +72,6 @@ setup(point.data = tczPoints,
       trunc.dist = TRUE,
       TCZ = TRUE)
 
-run_sims(scen.name)
+sim_out <- run_sims()
+save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2024)
 make_plots(scen.name)

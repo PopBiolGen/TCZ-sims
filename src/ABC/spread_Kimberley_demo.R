@@ -8,11 +8,15 @@ source("src/pprocess_functions.R")
 
 ######## load data ########
 load("dat/Posteriors_2023.RData")
+scen.name <- "kimberley-demo"
 
-k.points <- read.csv("dat/waterpoint-data_Kimberley_trimmed.csv")
+k.points <- read.csv("dat/waterpoint-data_Kimberley.csv")
+# fix a few idiosyncratic things
 k.points$origin_des <- as.numeric(as.factor(k.points$origin_des))-1
 k.points$colonised[is.na(k.points$colonised)] <- 0
 k.points$colonised[k.points$colonised==2009] <- 1
+# remove ABC data
+k.point <- k.points[, !(names(k.points) %in% c("X2021_pres", "X2022_pres", "X2023_pres"))]
 
 setup(point.data = k.points, 
       X.id = "X", 
@@ -30,7 +34,7 @@ gc()
 
 # make a target
 spread.table[spread.table[,"X"] == min(spread.table[,"X"]), "target"] <- 1
-
-
-
-system.time( temp <- run_sims(n.sims = 1, gens = 14, plot = TRUE, rollup = TRUE))
+# run a simulation to make a map
+k.spread <- run_sims(n.sims = 1, gens = 18, plot = FALSE, rollup = TRUE)
+save_outputs(output = k.spread, path = "out", scenario.name = scen.name, start.year=2009)
+make_plots(scen.name)

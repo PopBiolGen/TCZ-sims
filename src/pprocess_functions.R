@@ -10,7 +10,7 @@ dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
 } 
 
 # returns probability density for a truncated kernel
-# Assumes trunc.area has been worked out using trunc.dist in kernel.truncation()
+# Assumes trunc.area has been worked out during kernel fitting
 dcncross.trunc <- function(x, u, v, trunc.dist, trunc.area){
   if (is.null(trunc.dist)) return(dcncross(x, u, v))
   density <- dcncross(x, u, v)/trunc.area
@@ -219,42 +219,55 @@ rain_to_days <- function(rain.days, days.per.rain = 4){
 }
 
 # Finds points closer than threshold distance apart and removes one of the points
-# returns a filtered population table
-# to be used before creation of the spread table.
+# returns a filtered population table, and a filtered pairwise distance table
 remove_spatial_duplicates <- function(pop.mat, threshold){
   X <- pop.mat[,"X"]
   Y <- pop.mat[, "Y"]
-  pDists <- pdist(X, Y) # get pairwise distances
-  pDists[lower.tri(pDists, diag = TRUE)] <- threshold # set relevant parts to >threshold
+  outList <- vector(mode = "list", length = 2) #list to take outputs
+  cat("Calculating pairwise distance matrix...\n")
+  outList[[1]] <- pdist(X, Y) # get pairwise distances
+  gc() # free up memory
+  cat("Removing duplicates from tables...\n")
+  pd <- outList[[1]] # duplicate matrix for what comes next..
+  pd[lower.tri(pd, diag = TRUE)] <- threshold # set relevant parts to >threshold
   below_threshold <- function(x){x < threshold} 
-  tooClose <- apply(pDists, MARGIN = 1, FUN = below_threshold) # matrix
-  tooClose <- apply(tooClose, 2, FUN = sum) == 0 # colsums == 0
-  pop.mat[tooClose,]
+  pd <- apply(pd, MARGIN = 1, FUN = below_threshold) # matrix
+  tooClose <- apply(pd, 2, FUN = sum) == 0 # colsums == 0
+  rm(pd); gc() # free up memory
+  outList[[1]] <- outList[[1]][tooClose, tooClose] #subset pairwise matrix
+  outList[[2]] <- pop.mat[tooClose,]
+  names(outList) <- c("pairs_pdist", "spread.table")
+  outList
 }
 
 # function that will run sims on whatever has been thrown into environment by setup()
-run_sims <- function(scenario.name, n.sims = 100) { 
-  ######## how long to the pilbara (in wet seasons from dry season of 2024) ########
+run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) { 
   output<-vector("list", length=n.sims) # vector to take outputs
   
   for (rr in 1:n.sims){ # for reps
     cat("Rep ", rr, "\n")
     lambda.samp<-10^rnorm(1, mean=sample.lambda, sd=sample.lambda.sd)
     r.samp<-10^2
-    temp<-spread.pilb(pop=spread.table, gens=100, pairs=pairs, delta=lambda.samp, r=r.samp)
+    temp<-spread.pilb(pop=spread.table, gens=gens, pairs=pairs_pdist, delta=lambda.samp, r=r.samp, plot = plot, rollup = rollup)
     temp<-c(temp, list(pars=cbind(lambda=lambda.samp, r=r.samp)))
     output[[rr]]<-temp
   }
-  
+output
+}
+
+save_outputs <- function(output, path, scenario.name, start.year, plot.time = FALSE, ABC = FALSE){
   ######## save output and generate summaries ########
-  # time to arrive in Pilbara
-  out.name <- paste0("out/timing-to-pilbara_", scenario.name) # make filename for scenario
+  # time to arrive at target
+  out.name <- paste0(path, "/", scenario.name) # make filename for scenario
   
-  save(output, file = paste0(out.name, ".Rdata"))
+  #save(output, file = paste0(out.name, ".Rdata"))
+  if (ABC) {
+    save(output, file = paste0(out.name, ".RData"))
+    return()
+  }
   
   time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
-  
-  if (sum(is.finite(time.vec))>0) {
+  if (plot.time & sum(is.finite(time.vec))>0) {
     pdf(file = paste0(out.name, ".pdf"))
       hist(time.vec, xlab = "Time to the Pilbara (y)")
     dev.off()
@@ -265,7 +278,7 @@ run_sims <- function(scenario.name, n.sims = 100) {
   add_index_column <- function(x, index) { # Function to add index column to each matrix
     mat <- x$popmatrix[x$popmatrix[, "age"] > 0, ] # remove points never colonised
     index_col <- rep(index, n = nrow(mat))
-    arrival <- round(2024+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
+    arrival <- round(start.year+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
     cbind(index_col, mat, arrival)
   }
   # Apply the function to each element of the list using lapply
@@ -275,7 +288,7 @@ run_sims <- function(scenario.name, n.sims = 100) {
   # bind the lot together into single matrix
   pop.out <- do.call("rbind", modified_matrices)
   
-  # get mean arrival time for each point, or making a static map
+  # get mean arrival time for each point, for making a static map
   pop.summary <- pop.out %>% 
     as.data.frame() %>%
     group_by(ID) %>%
@@ -285,8 +298,8 @@ run_sims <- function(scenario.name, n.sims = 100) {
   # to make a dynamic map...
   # for each year, 2024 to max(mean arrival time), generate a csv to plot, that reports probability of colonisation at that time for each waterpoint
   max.time <- max(pop.summary$arrival) + 2
-  for (yy in 2024:max.time){
-    fname <- paste0("out/dynamic_maps/", scenario.name, "_", yy, ".csv")
+  for (yy in start.year:max.time){
+    fname <- paste0(path, "/dynamic_maps/", scenario.name, "_", yy, ".csv")
     pop.summary <- pop.out %>%
       as.data.frame() %>%
       group_by(ID) %>%
@@ -294,43 +307,6 @@ run_sims <- function(scenario.name, n.sims = 100) {
       filter(prob.colonised > 0.1)
     write.csv(pop.summary, file = fname, row.names = FALSE) 
   }
-}
-
-# spreads the population over gen generations, and compares predictions to observed spread
-spread<-function(pop, gens, pairs, delta, r, obs){ #pairs is a list from pdist.fast
-  preds<-NULL	
-for (i in 1:gens){
-		#if (i%%5==0) output(pop, i, K)
-		occp<-subset(pop, pop[,"Pres"]==1) #collect occupied sites
-		occp<-cbind(occp, lambda=rpois(nrow(occp), delta))
-		gma<-sum(occp[,"lambda"])
-		if (length(occp[,1])==length(pop[,1])) {
-			print(paste("No more vacant opportunities at generation", i))
-			break()	
-		}
-		potl<-pairs[occp[,"ID"]] #collect relevant parts of pair list
-		potl<-do.call("rbind", potl)
-		src.ID<-rep(occp[,"ID"], times=occp[,"n.pairs"])
-		potl<-cbind(src.ID, potl)
-		lambda<-rep(occp[,"lambda"], times=occp[,"n.pairs"])
-		U<-rep(occp[,"u"], times=occp[,"n.pairs"]) #expand source specific kernel parameters
-		V<-rep(occp[,"v"], times=occp[,"n.pairs"])
-		recruits<-lambda*dcncross(potl[,"dists"]+0.05, U, V) #calculate densities attributable to each pair
-		recruits<-(pi*r^2*neigh.corr(pairs, r))/gma*tapply(recruits, potl[,"snk.ID"], sum) #sum densities from colonised waterbodies over all waterbodies and convert to proportion
-		failures<-1-sum(recruits)
-		if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
-		recruits<-c(recruits, failures) #add on the failures
-		recruit.ID<-as.integer(names(recruits)[-length(recruits)])
-		recruits<-rmultinom(1, gma, recruits)[-length(recruits)]
-		recruits<-cbind(recruit.ID, recruits)
-		recruits<-subset(recruits, recruits[,"recruits"]>2)
-		pop[match(recruits[,"recruit.ID"], pop[,"ID"]), "Pres"]<-1
-		pop[which(pop[,"Pres"]==1), "age"]<-1+pop[which(pop[,"Pres"]==1), "age"]
-		preds<-rbind(preds,output_val(pop, i))
-	#plotter(pop, file.name=paste("gen",i,".png", sep=""))
-	#print(obs_pred_cf(preds,obs))
-	}
-		obs_pred_cf(preds,obs)
 }
 
 
@@ -342,13 +318,17 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   present.id = "ARRIVE_MCP",
                   artificial.natural.id = "art_nat",
                   rain.id = "rain_1mm",
+                  observations = NULL,
                   remove_duplicates = TRUE,
                   threshold = 100, # metres within which to filter out duplicates
                   constant.rain = NULL, # else number of days you want across whole area 
                   trunc.dist = TRUE, # false for full kernel
                   TCZ = FALSE # implement the TCZ, or not?
                   ){
+  cat("Loading kernel parameters...\n")
   load("dat/Kernel-fits_truncated.RData")
+  
+  cat("Loading point data...\n")
   if (is.object(point.data)) { 
     pData <- point.data
   } else {
@@ -357,21 +337,11 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   if (TCZ) pData <- subset(pData, !(pData[["TCZ"]] == 1 & pData[[artificial.natural.id]] == 0))
   
+  cat("Loading posterior estimates...\n")
   load("dat/Posteriors.RData")
-  #get matrix for the 'spread' function
-  # need matrix containing:
-  # "ID, X, Y, Pres (0s), n.pairs, u (rainy days*85.35[which is estimate of u]), 
-  # age (0s)"
   
-  ID <- 1:nrow(pData)
-  X <- pData[[X.id]]
-  Y <- pData[[Y.id]]
-  Pres <- pData[[present.id]]
-  target <- Pres==2
-  Pres[Pres==2] <- 0
-  age <- Pres # set already colonised to age = 1
-  nats <- pData[[artificial.natural.id]]==0
   
+  cat("Assigning kernel parameters to waterpoints...\n")
   # assign kernel values to waterpoints
   if (is.null(constant.rain)){
     u <- rain_to_days(pData[[rain.id]])
@@ -380,15 +350,32 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   u<-fits[u, c("u", "v", "max.dist", "area")]
   if (!trunc.dist) u[, "max.dist"] <- NULL # to switch to infinite positive bounds on kernel
   
-  spread.table <-  cbind(ID, X, Y, Pres, target, u, age, nats)
+  cat("Building spread table...\n")
+  
+  tg <- pData[[present.id]]==2 # identify target sites
+  pData[[present.id]][pData[[present.id]]==2] <- 0 # re-set targetted sites to 0
+  
+  spread.table <-  cbind(ID = 1:nrow(pData),
+                         X = pData[[X.id]],
+                         Y = pData[[Y.id]],
+                         target = tg,
+                         u = u,
+                         Pres = pData[[present.id]], # replace 2 from target with 0
+                         age = pData[[present.id]], # set already colonised to age = 1
+                         nats = as.numeric(pData[[artificial.natural.id]]==0),
+                         obs = as.matrix(pData[observations])) # does nothing if NULL, else vector of column names
+  
   
   if (remove_duplicates) {
-    spread.table <- remove_spatial_duplicates(spread.table, threshold)
+    outList <- remove_spatial_duplicates(spread.table, threshold)
+  }else {
+    cat("Calculating pairwise distance matrix...\n")
+    pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
+    
+    outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   }
   
-  pairs_pdist<-pdist(X = spread.table[, "X"],Y = spread.table[, "Y"])
-  
-  outList <- list(spread.table = spread.table, pairs = pairs_pdist)
+  cat("Placing spread table and pairwise distance matrix in: ")
   list2env(outList, envir = globalenv())
 }
 
@@ -396,11 +383,19 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 # spreads the population over gens generations or until target sites are reached
 # returns number of generations
 # target is a vector of rows of pop that contain targets
-spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list from pdist.fast  
+spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is a list from pdist.fast  
   trigger <- TRUE # to catch time to first arrival in pilbara
-  time.to.pilbara <- NA
+  time.to.target <- NA
+  # A progress bar
+  pb <- txtProgressBar(min = 0, max = gens, style = 3)
   for (i in 1:gens){
-		occp <- pop[,"Pres"]==1 #which sites are occupied
+		#which sites are occupied
+		if (rollup) {
+		  occp <- pop[,"Pres"]==1 & pop[, "age"] < 4 # for large simulations, can stop processing points 4+ y colonised
+		}else {
+		  occp <- pop[,"Pres"]==1 
+		}
+    
 		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
 		gma <- sum(lambda_t_x) # total propagules at this time step
 		pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pair matrix
@@ -419,22 +414,27 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE){ #pairs is a list 
 		                         MARGIN = c(1,2), 
 		                         STATS = pi*r^2, 
 		                         FUN = "*")
+		gc() # tidy up memory
 		expected_n <- colSums(marg_expected_n, na.rm = TRUE) # sum contributions from all sources
-		failures <- gma-sum(expected_n)
-		if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
-		expected_n <- c(expected_n, failures) # add failures
-		realised_n <- rmultinom(1, gma, expected_n)[-length(expected_n)] # draw propagules
-		colonised <- realised_n > 2
+		if (gma < .Machine$integer.max){ # when we go over machine tolerance, skip draw from multinom (realised likely to be very close to expected)
+		  failures <- gma-sum(expected_n)
+		  if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
+		  expected_n <- c(expected_n, failures) # add failures
+		  realised_n <- rmultinom(1, gma, expected_n)[-length(expected_n)] # draw propagules
+		  colonised <- realised_n > 2
+		}else colonised <- expected_n > 2
 		pop[colonised, "Pres"] <- 1 #set to colonised
 		occp <- pop[,"Pres"]==1 #which sites are occupied now
 		pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
-		if (plot==TRUE) plotter(pop, file.name=paste(i,".png", sep=""), gen=i)
+		if (plot) plotter(pop, file.name=paste("out/", i,".png", sep=""), gen=i)
 		test.condition <- sum(pop[pop[, "target"]==1,"Pres"]) # number of target sites occupied
     if (test.condition > 0 && trigger) {
-      time.to.pilbara <- i #record time of arrival
+      time.to.target <- i #record time of arrival
       trigger <- FALSE
     }
-		if (test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
-	}
-	list(gen=time.to.pilbara, popmatrix=pop)	
+		if (test.condition > 0 & test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
+		setTxtProgressBar(pb, i)
+  }
+  close(pb) # close progress bar
+	list(gen=time.to.target, popmatrix=pop)	
 }

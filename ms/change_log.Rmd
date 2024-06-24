@@ -3,6 +3,14 @@ title: "Catalogue of changes from Tingley et al 2013"
 output: html_notebook
 ---
 
+## Data update
+
+We updated the waterpoint data using latest versions of geospatial data.  To do this we took Landgate-016 layer and filtered for perennial waterpoints that were also not estuaries.  We then placed a point every 2km along shorelines of that dataset.  2km was chosen as we know (from Smart 2020, and Florance 2011) that with observed linear toad densities (from Smart) this equates to about the same number of adult toads that can be supported over a dry season at a point source of water. 
+
+To this layer, we added landgate-017 filtered for permanent artifical waterpoints.
+
+Finally, in the La Grange region, we pored over google earth images and manually digitised anything that looked like pastoral watering points.  These will be checked with pastoralists.
+
 ## Switch from cell-based truncation to kernel-based truncation
 
 Legacy code utilised a complicated process for matching pairs, by placing 100km grid over the landscape and only calculating pairwise interactions for location $i$ by examining the set of other sites, $j$ that were in $i$'s cell or neighbouring cells. This was done at the time to improve computation time, but also placed some structural truncation on dispersal distance.
@@ -25,5 +33,20 @@ The spatial plotting was broken with the loss of `RGDAL` and `Dismo` functionali
 
 We have made the function mapping number of days of rain to number of days of movement into its own function.  In doing so we also allowed the number of days movement per day of rain to vary: this precipitated expressing the function as an intersection of probabilities, rather than a union, as it was before.
 
+## Re-fit to Kimberley spread
 
+The Tingley *et al.* model was fit to a small dataset from the VRD in order to estimate key parameters.  We now have the opportunity to train the model on the spread across the entire Kimberley.  To do this, we took observations of toad presence/absence across the toad front in 2021, 2022, 2023, and built minimum convex polygons around observations for presences, and absences in each year.  Water points falling within the MCPs were considered to be observed present or absent for toads in that year.  
 
+We learned during fitting of Tingely et al. that the parameters affecting $\lambda$ (propagules per point) and detection radius, $r$, were negatively correlated.  Thus, for convenience, we simply set the detection radius per point to $r = 300$m, and estimate $\lambda$.  
+
+We have observed a starting location and time (around lake Argyle in 2009) and the position of the invasion front in 2022-2023.  Thus we can run the spread process under varying parameter combinations across the Kimberley landscape and use approximate bayesian computation (ABC) to estimate, $\lambda$.
+
+The procedure for ABC is as follows.  
+
+1. Draw sample values of $\hat\lambda$ from the prior (previous posterior).
+2. Initiate the population at the known colonised area around lake Argyle in 2009
+3. Run the model and score number of correctly classified waterpoints in 2021, 2022, and 2023.
+4. Calculate the sum of correct classifications, $\Sigma$.
+4. Rinse and repeat.
+
+Do this a large number of times and keep the runs with a high value for $\Sigma$.  These are treated as samples from the posterior for each sampled parameter.

@@ -31,11 +31,13 @@ load("dat/Posteriors.RData")
 
 load(file = "out/setup_kimberley.RData")
 
-
+# extend parameter space left of old priors..
+sample.lambda <- 5
+sample.lambda.sd <- 2.5 * sample.lambda.sd
 
 
 # run
-for (ii in 1:1){
-  sim.set <- run_sims(n.sims = 2, gens = 14, plot = FALSE, rollup = TRUE)
+for (ii in 31:40){
+  sim.set <- run_sims(n.sims = 5, gens = 14, plot = FALSE, rollup = TRUE)
   save_outputs(sim.set, path = "out/ABC", scenario.name = paste0("ABC_", ii), start.year = 2009, ABC = TRUE)
 }

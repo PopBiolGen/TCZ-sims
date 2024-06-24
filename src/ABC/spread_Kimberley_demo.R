@@ -7,7 +7,7 @@ source("src/pprocess_functions.R")
 # R_MAX_VSIZE=100Gb
 
 ######## load data ########
-load("dat/Posteriors.RData")
+load("dat/Posteriors_2023.RData")
 
 k.points <- read.csv("dat/waterpoint-data_Kimberley_trimmed.csv")
 k.points$origin_des <- as.numeric(as.factor(k.points$origin_des))-1
@@ -30,7 +30,6 @@ gc()
 
 # make a target
 spread.table[spread.table[,"X"] == min(spread.table[,"X"]), "target"] <- 1
-save(spread.table, pairs_pdist, file = "out/setup_kimberley.RData")
 
 
 

@@ -261,6 +261,10 @@ save_outputs <- function(output, path, scenario.name, start.year, plot.time = FA
   out.name <- paste0(path, "/", scenario.name) # make filename for scenario
   
   #save(output, file = paste0(out.name, ".Rdata"))
+  if (ABC) {
+    save(output, file = paste0(out.name, ".RData"))
+    return()
+  }
   
   time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
   if (plot.time & sum(is.finite(time.vec))>0) {
@@ -283,11 +287,6 @@ save_outputs <- function(output, path, scenario.name, start.year, plot.time = FA
   })
   # bind the lot together into single matrix
   pop.out <- do.call("rbind", modified_matrices)
-  
-  if (ABC) {
-    save(pop.out, file = paste0(out.name, ".RData"))
-    return()
-  }
   
   # get mean arrival time for each point, for making a static map
   pop.summary <- pop.out %>% 
@@ -392,7 +391,7 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
   for (i in 1:gens){
 		#which sites are occupied
 		if (rollup) {
-		  occp <- pop[,"Pres"]==1 & pop[, "age"] < 5 # for large simulations, can stop processing points 5+ y colonised
+		  occp <- pop[,"Pres"]==1 & pop[, "age"] < 4 # for large simulations, can stop processing points 4+ y colonised
 		}else {
 		  occp <- pop[,"Pres"]==1 
 		}
@@ -427,7 +426,7 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
 		pop[colonised, "Pres"] <- 1 #set to colonised
 		occp <- pop[,"Pres"]==1 #which sites are occupied now
 		pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
-		if (plot==TRUE) plotter(pop, file.name=paste("out/", i,".png", sep=""), gen=i)
+		if (plot) plotter(pop, file.name=paste("out/", i,".png", sep=""), gen=i)
 		test.condition <- sum(pop[pop[, "target"]==1,"Pres"]) # number of target sites occupied
     if (test.condition > 0 && trigger) {
       time.to.target <- i #record time of arrival

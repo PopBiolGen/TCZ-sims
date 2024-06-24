@@ -260,9 +260,8 @@ save_outputs <- function(output, path, scenario.name, start.year, plot.time = FA
   # time to arrive at target
   out.name <- paste0(path, "/", scenario.name) # make filename for scenario
   
-  #save(output, file = paste0(out.name, ".Rdata"))
+  save(output, file = paste0(out.name, ".RData"))
   if (ABC) {
-    save(output, file = paste0(out.name, ".RData"))
     return()
   }
   

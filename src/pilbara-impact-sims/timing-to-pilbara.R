@@ -40,6 +40,6 @@ setup(point.data = tczPoints,
       trunc.dist = TRUE,
       TCZ = TRUE)
 
-sim_out <- run_sims(plot = FALSE, rollup = FALSE)
+sim_out <- run_sims(gens = 50, plot = FALSE, rollup = FALSE)
 save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2023)
 make_plots(scen.name)

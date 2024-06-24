@@ -51,7 +51,7 @@ knock.out.path<-function(pdist.list, point, n.points=2, natural){
 
 # function to make plots based on a scenario name
 make_plots <- function(scenario.name) {
-  in.name <- paste0("out/timing-to-pilbara_", scenario.name) # get filename for scenario
+  in.name <- paste0("out/", scenario.name) # get filename for scenario
   ######### Make a static map of estimated arrival time #########
   # function to read point data (in Albers) and cast to sf with a CRS
   read.point.data <- function(fname) {
@@ -352,6 +352,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   cat("Building spread table...\n")
   
+  pData[[present.id]][is.na(pData[[present.id]])] <- 0 # set NAs to 0
   tg <- pData[[present.id]]==2 # identify target sites
   pData[[present.id]][pData[[present.id]]==2] <- 0 # re-set targetted sites to 0
   
@@ -395,7 +396,7 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
 		}else {
 		  occp <- pop[,"Pres"]==1 
 		}
-    
+    #browser()
 		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
 		gma <- sum(lambda_t_x) # total propagules at this time step
 		pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pair matrix

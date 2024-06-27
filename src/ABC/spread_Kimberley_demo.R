@@ -18,8 +18,8 @@ k.points$colonised[k.points$colonised==2009] <- 1
 # remove ABC data
 k.point <- k.points[, !(names(k.points) %in% c("X2021_pres", "X2022_pres", "X2023_pres"))]
 
-setup(point.data = k.points, 
-      X.id = "X", 
+setup(point.data = k.points,
+      X.id = "X",
       Y.id = "Y",
       present.id = "colonised",
       artificial.natural.id = "origin_des",
@@ -28,13 +28,14 @@ setup(point.data = k.points,
       constant.rain = NULL,
       trunc.dist = TRUE,
       TCZ = FALSE)
-
 rm(k.points) #free up some memory
 gc()
+save(spread.table, pairs_pdist, file = "out/setup_kimberley_complete.RData")
+#load(file = "out/setup_kimberley_complete.RData")
 
 # make a target
 spread.table[spread.table[,"X"] == min(spread.table[,"X"]), "target"] <- 1
 # run a simulation to make a map
-k.spread <- run_sims(n.sims = 1, gens = 18, plot = FALSE, rollup = TRUE)
+k.spread <- run_sims(n.sims = 5, gens = 18, plot = FALSE, rollup = TRUE)
 save_outputs(output = k.spread, path = "out", scenario.name = scen.name, start.year=2009)
 make_plots(scen.name)

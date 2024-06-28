@@ -383,7 +383,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
     
     outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   }
-  write.csv(spread.table, file = "basemap_points.csv") # for mapping later
+  write.csv(spread.table, file = "out/basemap_points.csv") # for mapping later
   cat("Placing spread table and pairwise distance matrix in: ")
   list2env(outList, envir = globalenv())
 }

@@ -51,7 +51,7 @@ knock.out.path<-function(pdist.list, point, n.points=2, natural){
 
 # function to make plots based on a scenario name
 make_plots <- function(scenario.name) {
-  in.name <- paste0("out/timing-to-pilbara_", scenario.name) # get filename for scenario
+  in.name <- paste0("out/", scenario.name) # get filename for scenario
   ######### Make a static map of estimated arrival time #########
   # function to read point data (in Albers) and cast to sf with a CRS
   read.point.data <- function(fname) {
@@ -179,20 +179,24 @@ pathway<-function(pdist.list, point, n.points=2, natural){
 
 # Computes full distance matrix given vectors of X, and Y coordinates
 pdist <- function(X, Y){
-  X<-X-min(X) # start coordinates at zero
-  Y<-Y-min(Y)
-  # function for calculating squared distances along each axis
-  sq.dist <- function(x_1, x_2){
-    (x_1-x_2)^2
+  if (length(X) < 10000){
+    X<-X-min(X) # start coordinates at zero
+    Y<-Y-min(Y)
+    # function for calculating squared distances along each axis
+    sq.dist <- function(x_1, x_2){
+      (x_1-x_2)^2
+    }
+    # returns euclidean distance given squared distances along x and y (thanks Pythagoras)
+    euc.dist <- function(sq.dist.x, sq.dist.y){
+      sqrt(sq.dist.x + sq.dist.y)
+    }
+    s.d.x <- outer(X, X, FUN = sq.dist)
+    s.d.y <- outer(Y, Y, FUN = sq.dist)
+    p.dist <- euc.dist(s.d.x, s.d.y)
+    return(p.dist)
+  } else {
+    return(as.matrix(dist(cbind(X, Y))))
   }
-  # returns euclidean distance given squared distances along x and y (thanks Pythagoras)
-  euc.dist <- function(sq.dist.x, sq.dist.y){
-    sqrt(sq.dist.x + sq.dist.y)
-  }
-  s.d.x <- outer(X, X, FUN = sq.dist)
-  s.d.y <- outer(Y, Y, FUN = sq.dist)
-  p.dist <- euc.dist(s.d.x, s.d.y)
-  p.dist
 }
 
 #plots opportunities and colonised populations
@@ -223,19 +227,24 @@ rain_to_days <- function(rain.days, days.per.rain = 4){
 remove_spatial_duplicates <- function(pop.mat, threshold){
   X <- pop.mat[,"X"]
   Y <- pop.mat[, "Y"]
+  gc.switch <- ifelse(length(X) > 10000, TRUE, FALSE) # do we need to manage memory?
   outList <- vector(mode = "list", length = 2) #list to take outputs
   cat("Calculating pairwise distance matrix...\n")
   outList[[1]] <- pdist(X, Y) # get pairwise distances
-  gc() # free up memory
-  cat("Removing duplicates from tables...\n")
-  pd <- outList[[1]] # duplicate matrix for what comes next..
-  pd[lower.tri(pd, diag = TRUE)] <- threshold # set relevant parts to >threshold
-  below_threshold <- function(x){x < threshold} 
-  pd <- apply(pd, MARGIN = 1, FUN = below_threshold) # matrix
+  if (gc.switch) gc() # free up memory
+  cat("Finding spatial duplicates...\n")
+  cat("\t Thresholding...\n")
+  pd <- outList[[1]] < threshold # logical matrix for what comes next..
+  cat("\t Removing symmetry...\n")
+  pd[lower.tri(pd, diag = TRUE)] <- FALSE # set lower triangle to FALSE
+  if (gc.switch) gc() # free up memory from lower.tri
+  cat("\t Finding duplicates...\n")
   tooClose <- apply(pd, 2, FUN = sum) == 0 # colsums == 0
-  rm(pd); gc() # free up memory
+  if (gc.switch) rm(pd); gc() # free up memory from lower.tri
+  cat("Removing spatial duplicates...\n")
   outList[[1]] <- outList[[1]][tooClose, tooClose] #subset pairwise matrix
   outList[[2]] <- pop.mat[tooClose,]
+  if (gc.switch) gc()
   names(outList) <- c("pairs_pdist", "spread.table")
   outList
 }
@@ -251,6 +260,7 @@ run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) {
     temp<-spread.pilb(pop=spread.table, gens=gens, pairs=pairs_pdist, delta=lambda.samp, r=r.samp, plot = plot, rollup = rollup)
     temp<-c(temp, list(pars=cbind(lambda=lambda.samp, r=r.samp)))
     output[[rr]]<-temp
+    gc() # cleanup memory
   }
 output
 }
@@ -260,11 +270,11 @@ save_outputs <- function(output, path, scenario.name, start.year, plot.time = FA
   # time to arrive at target
   out.name <- paste0(path, "/", scenario.name) # make filename for scenario
   
-  #save(output, file = paste0(out.name, ".Rdata"))
+  save(output, file = paste0(out.name, ".RData"))
   if (ABC) {
-    save(output, file = paste0(out.name, ".RData"))
     return()
   }
+  write.csv(output[[1]]$popmatrix, file = "out/basemap_points.csv", row.names = FALSE)
   
   time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
   if (plot.time & sum(is.finite(time.vec))>0) {
@@ -352,6 +362,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   
   cat("Building spread table...\n")
   
+  pData[[present.id]][is.na(pData[[present.id]])] <- 0 # set NAs to 0
   tg <- pData[[present.id]]==2 # identify target sites
   pData[[present.id]][pData[[present.id]]==2] <- 0 # re-set targetted sites to 0
   
@@ -395,7 +406,7 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
 		}else {
 		  occp <- pop[,"Pres"]==1 
 		}
-    
+    #browser()
 		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
 		gma <- sum(lambda_t_x) # total propagules at this time step
 		pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pair matrix

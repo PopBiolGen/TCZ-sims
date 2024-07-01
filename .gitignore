@@ -1,5 +1,6 @@
 .Rproj.user/
 spread-model.Rproj
 .DS_Store
-out/*.*
+out/
 ms/*.html
+dat/

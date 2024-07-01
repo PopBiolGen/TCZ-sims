@@ -2,76 +2,44 @@
 source("src/pprocess_functions.R")
 
 ######## load data ########
-load("dat/Posteriors.RData")
+load("dat/Posteriors_2023.RData")
 
-tczPoints <-read.csv("dat/merged_clipped_for_simulation.csv")
+tczPoints <-read.csv("dat/waterpoint-data_LaGrange.csv")
 tczPoints$origin_des <- as.numeric(as.factor(tczPoints$origin_des))-1
 
 
-######## worst case scenario ########
-scen.name <- "worst-case"
+######## do-nothing scenario ########
+scen.name <- "do-nothing"
 setup(point.data = tczPoints, 
       X.id = "X", 
       Y.id = "Y",
       present.id = "colonised",
       artificial.natural.id = "origin_des",
-      rain.id = "daysRain_1",
-      threshold = 50,
-      constant.rain = 180,
-      trunc.dist = TRUE,
-      TCZ = FALSE)
-
-sim_out <- run_sims()
-save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2024)
-make_plots(scen.name)
-
-######## likely case scenario ########
-scen.name <- "likely-case"
-setup(point.data = tczPoints, 
-      X.id = "X", 
-      Y.id = "Y",
-      present.id = "colonised",
-      artificial.natural.id = "origin_des",
-      rain.id = "daysRain_1",
-      threshold = 50,
+      rain.id = "ndays_1",
+      threshold = 100,
       constant.rain = NULL,
       trunc.dist = TRUE,
       TCZ = FALSE)
-
-sim_out <- run_sims()
-save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2024)
+# write out points for basemapping
+write.csv(spread.table, file = "out/basemap_points.csv", row.names = FALSE)
+# run sims..
+sim_out <- run_sims(gens = 100, plot = FALSE, rollup = FALSE)
+save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2023)
 make_plots(scen.name)
 
-######## worst case scenario, but with TCZ ########
-scen.name <- "worst-case_TCZ"
+######## TCZ scenario ########
+scen.name <- "TCZ"
 setup(point.data = tczPoints, 
       X.id = "X", 
       Y.id = "Y",
       present.id = "colonised",
       artificial.natural.id = "origin_des",
-      rain.id = "daysRain_1",
-      threshold = 50,
-      constant.rain = 180,
-      trunc.dist = TRUE,
-      TCZ = TRUE)
-
-sim_out <- run_sims()
-save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2024)
-make_plots(scen.name)
-
-######## likely scenario, but with TCZ ########
-scen.name <- "likely-case_TCZ"
-setup(point.data = tczPoints, 
-      X.id = "X", 
-      Y.id = "Y",
-      present.id = "colonised",
-      artificial.natural.id = "origin_des",
-      rain.id = "daysRain_1",
-      threshold = 50,
+      rain.id = "ndays_1",
+      threshold = 100,
       constant.rain = NULL,
       trunc.dist = TRUE,
       TCZ = TRUE)
 
-sim_out <- run_sims()
-save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2024)
+sim_out <- run_sims(gens = 50, plot = FALSE, rollup = FALSE)
+save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2023)
 make_plots(scen.name)

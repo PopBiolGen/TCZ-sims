@@ -10,28 +10,28 @@ source("src/pprocess_functions.R")
 load("dat/Posteriors_2023.RData")
 scen.name <- "kimberley-demo"
 
-# k.points <- read.csv("dat/waterpoint-data_Kimberley.csv")
-# # fix a few idiosyncratic things
-# k.points$origin_des <- as.numeric(as.factor(k.points$origin_des))-1
-# k.points$colonised[is.na(k.points$colonised)] <- 0
-# k.points$colonised[k.points$colonised==2009] <- 1
-# # remove ABC data
-# k.point <- k.points[, !(names(k.points) %in% c("X2021_pres", "X2022_pres", "X2023_pres"))]
-# 
-# setup(point.data = k.points,
-#       X.id = "X",
-#       Y.id = "Y",
-#       present.id = "colonised",
-#       artificial.natural.id = "origin_des",
-#       rain.id = "ndays_1",
-#       threshold = 100,
-#       constant.rain = NULL,
-#       trunc.dist = TRUE,
-#       TCZ = FALSE)
-# rm(k.points) #free up some memory
-# gc()
-# save(spread.table, pairs_pdist, file = "out/setup_kimberley_complete.RData")
-load(file = "out/setup_kimberley_complete.RData")
+k.points <- read.csv("dat/waterpoint-data_Kimberley.csv")
+# fix a few idiosyncratic things
+k.points$origin_des <- as.numeric(as.factor(k.points$origin_des))-1
+k.points$colonised[is.na(k.points$colonised)] <- 0
+k.points$colonised[k.points$colonised==2009] <- 1
+# remove ABC data
+k.point <- k.points[, !(names(k.points) %in% c("X2021_pres", "X2022_pres", "X2023_pres"))]
+
+setup(point.data = k.points,
+      X.id = "X",
+      Y.id = "Y",
+      present.id = "colonised",
+      artificial.natural.id = "origin_des",
+      rain.id = "ndays_1",
+      threshold = 100,
+      constant.rain = NULL,
+      trunc.dist = TRUE,
+      TCZ = FALSE)
+rm(k.points) #free up some memory
+gc()
+save(spread.table, pairs_pdist, file = "out/setup_kimberley_complete.RData")
+#load(file = "out/setup_kimberley_complete.RData")
 
 # make a target
 spread.table[spread.table[,"X"] == min(spread.table[,"X"]), "target"] <- 1

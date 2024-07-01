@@ -260,6 +260,7 @@ run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) {
     temp<-spread.pilb(pop=spread.table, gens=gens, pairs=pairs_pdist, delta=lambda.samp, r=r.samp, plot = plot, rollup = rollup)
     temp<-c(temp, list(pars=cbind(lambda=lambda.samp, r=r.samp)))
     output[[rr]]<-temp
+    gc() # cleanup memory
   }
 output
 }
@@ -273,6 +274,7 @@ save_outputs <- function(output, path, scenario.name, start.year, plot.time = FA
   if (ABC) {
     return()
   }
+  write.csv(output[[1]]$popmatrix, file = "out/basemap_points.csv", row.names = FALSE)
   
   time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
   if (plot.time & sum(is.finite(time.vec))>0) {
@@ -383,7 +385,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
     
     outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   }
-  write.csv(spread.table, file = "out/basemap_points.csv") # for mapping later
+  
   cat("Placing spread table and pairwise distance matrix in: ")
   list2env(outList, envir = globalenv())
 }

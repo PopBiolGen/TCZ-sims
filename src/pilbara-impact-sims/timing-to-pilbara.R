@@ -6,7 +6,19 @@ load("dat/Posteriors_2023.RData")
 
 tczPoints <-read.csv("dat/waterpoint-data_LaGrange.csv")
 tczPoints$origin_des <- as.numeric(as.factor(tczPoints$origin_des))-1
+tczPoints <- select(tczPoints, X, Y, origin_des, ndays_1, colonised, TCZ)
+tczPoints$colonised[is.na(tczPoints$colonised)] <- 0
 
+# read in additional points from Tim
+d_extra <- st_read("dat/tims_points.kml")
+d_extra <- st_transform(d_extra, crs = 3577) # convert to Albers
+coords <- st_coordinates(d_extra) %>% 
+  as.data.frame() %>%
+  mutate(origin_des = 0, ndays_1 = 34, colonised = 0, TCZ = 0) %>%
+  select(-Z)
+
+tczPoints <- rbind(tczPoints, coords) 
+            
 
 ######## do-nothing scenario ########
 scen.name <- "do-nothing"
@@ -23,7 +35,7 @@ setup(point.data = tczPoints,
 # write out points for basemapping
 write.csv(spread.table, file = "out/basemap_points.csv", row.names = FALSE)
 # run sims..
-sim_out <- run_sims(gens = 100, plot = FALSE, rollup = FALSE)
+sim_out <- run_sims(n.sims = 50, gens = 50, plot = FALSE, rollup = FALSE)
 save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2023)
 make_plots(scen.name)
 
@@ -40,6 +52,6 @@ setup(point.data = tczPoints,
       trunc.dist = TRUE,
       TCZ = TRUE)
 
-sim_out <- run_sims(gens = 50, plot = FALSE, rollup = FALSE)
+sim_out <- run_sims(n.sims = 50, gens = 50, plot = FALSE, rollup = FALSE)
 save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2023)
 make_plots(scen.name)

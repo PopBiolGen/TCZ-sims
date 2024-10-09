@@ -3,7 +3,7 @@ source("src/pprocess_functions.R")
 
 
 ######## load data ########
-load("dat/Posteriors_2023.RData")
+load("dat/Posteriors.RData")
 scen.name <- "paruku-arrival"
 
 pk.points <- read.csv("dat/waterpoint-data_Paruku.csv")

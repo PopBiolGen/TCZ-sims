@@ -2,7 +2,7 @@
 source("src/pprocess_functions.R")
 
 ######## load data ########
-load("dat/Posteriors_2023.RData")
+load("dat/Posteriors.RData")
 
 tczPoints <-read.csv("dat/waterpoint-data_LaGrange.csv")
 tczPoints$origin_des <- as.numeric(as.factor(tczPoints$origin_des))-1

@@ -50,7 +50,7 @@ knock.out.path<-function(pdist.list, point, n.points=2, natural){
 }
 
 # function to make plots based on a scenario name
-make_plots <- function(scenario.name) {
+make_plots <- function(scenario.name, plot.year = TRUE) {
   in.name <- paste0("out/", scenario.name) # get filename for scenario
   ######### Make a static map of estimated arrival time #########
   # function to read point data (in Albers) and cast to sf with a CRS
@@ -106,6 +106,7 @@ make_plots <- function(scenario.name) {
     temp <- read.point.data(fname = paste0(fpath, yy))
     year.name <- gsub(".csv", "", yy)
     fname <- paste0(fpath, year.name, ".png")
+    if (plot.year) y.name.plot <- year.name else y.name.plot <- ""
     p <- tm_shape(bm,
                   unit = "km") +
       tm_rgb() +
@@ -114,7 +115,7 @@ make_plots <- function(scenario.name) {
               col = "prob.colonised",
               breaks = seq(0, 1, length.out = 5),
               title = "Probability of colonisation") +
-      tm_layout(title = gsub("[^0-9]", "", year.name))
+      tm_layout(title = gsub("[^0-9]", "", y.name.plot))
     tmap_save(p, filename = fname)
   }
   

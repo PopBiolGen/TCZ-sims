@@ -37,7 +37,7 @@ write.csv(spread.table, file = "out/basemap_points.csv", row.names = FALSE)
 # run sims..
 sim_out <- run_sims(n.sims = 50, gens = 50, plot = FALSE, rollup = FALSE)
 save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2023)
-make_plots(scen.name)
+make_plots(scen.name, plot.year = FALSE)
 
 ######## TCZ scenario ########
 scen.name <- "TCZ"

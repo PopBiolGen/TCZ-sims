@@ -27,6 +27,6 @@ save(spread.table, pairs_pdist, file = "out/setup_paruku_complete.RData")
 
 
 # run a simulation to make a map
-pk.spread <- run_sims(n.sims = 100, gens = 50, plot = FALSE, rollup = FALSE)
+pk.spread <- run_sims(n.sims = 20, gens = 50, plot = FALSE, rollup = FALSE)
 save_outputs(output = pk.spread, path = "out", scenario.name = scen.name, start.year=2011)
 make_plots(scen.name)

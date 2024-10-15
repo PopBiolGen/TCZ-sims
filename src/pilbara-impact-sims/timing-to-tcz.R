@@ -26,8 +26,9 @@ tcz.ne.corner <- st_coordinates(tcz.ne.corner)
 
 # set all points south and east of tcz.ne.corner to be target points
 tczPoints$colonised[tczPoints$X < tcz.ne.corner[1, "X"] & tczPoints$Y < tcz.ne.corner[1, "Y"]] <- 2
+# remove all points >10km south of tcz.ne.corner
+tczPoints <- subset(tczPoints, tczPoints$Y > (tcz.ne.corner[1, "Y"]-10000))
 
-            
 
 ######## tcz-arrival scenario ########
 scen.name <- "tcz-arrival"
@@ -44,6 +45,6 @@ setup(point.data = tczPoints,
 # write out points for basemapping
 write.csv(spread.table, file = "out/basemap_points.csv", row.names = FALSE)
 # run sims..
-sim_out <- run_sims(n.sims = 50, gens = 50, plot = FALSE, rollup = FALSE)
+sim_out <- run_sims(n.sims = 50, gens = 20, plot = FALSE, rollup = FALSE)
 save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2023)
 make_plots(scen.name, plot.year = FALSE)

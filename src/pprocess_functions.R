@@ -335,7 +335,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   constant.rain = NULL, # else number of days you want across whole area 
                   trunc.dist = TRUE, # false for full kernel
                   TCZ = FALSE # implement the TCZ, or not?
-                  ){
+){
   cat("Loading kernel parameters...\n")
   load("dat/Kernel-fits_truncated.RData")
   
@@ -343,8 +343,8 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   if (is.object(point.data)) { 
     pData <- point.data
   } else {
-      pData <- read.csv(point.data)
-    }
+    pData <- read.csv(point.data)
+  }
   
   if (TCZ) pData <- subset(pData, !(pData[["TCZ"]] == 1 & pData[[artificial.natural.id]] == 0))
   
@@ -374,9 +374,11 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                          u = u,
                          Pres = pData[[present.id]], # replace 2 from target with 0
                          age = pData[[present.id]], # set already colonised to age = 1
-                         nats = as.numeric(pData[[artificial.natural.id]]==0),
-                         obs = as.matrix(pData[observations])) # does nothing if NULL, else vector of column names
+                         nats = as.numeric(pData[[artificial.natural.id]]==0))
   
+  if (!is.null(observations)){ # does nothing if NULL, else vector of column names
+    spread.table <- cbind(spread.table, obs = as.matrix(pData[observations]))
+  }
   
   if (remove_duplicates) {
     outList <- remove_spatial_duplicates(spread.table, threshold)
@@ -390,6 +392,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   cat("Placing spread table and pairwise distance matrix in: ")
   list2env(outList, envir = globalenv())
 }
+
 
 
 # spreads the population over gens generations or until target sites are reached

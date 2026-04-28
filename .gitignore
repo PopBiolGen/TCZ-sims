@@ -4,3 +4,5 @@ spread-model.Rproj
 out/
 ms/*.html
 dat/
+.positai
+*.Rproj

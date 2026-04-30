@@ -1,8 +1,10 @@
 library(sf)
 library(tmap)
+library(terra)
 library(tmaptools)
 library(magick)
 library(dplyr)
+library(ggplot2)
 
 #The kernel
 dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D

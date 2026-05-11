@@ -8,7 +8,7 @@ library(ggplot2)
 
 #The kernel
 dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
-  (x*u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi*x)
+  (u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi)
 } 
 
 # returns probability density for a truncated kernel

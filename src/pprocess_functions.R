@@ -431,7 +431,6 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
 		                         MARGIN = c(1,2), 
 		                         STATS = pi*r^2, 
 		                         FUN = "*")
-		gc() # tidy up memory
 		expected_n <- colSums(marg_expected_n, na.rm = TRUE) # sum contributions from all sources
 		if (gma < .Machine$integer.max){ # when we go over machine tolerance, skip draw from multinom (realised likely to be very close to expected)
 		  failures <- gma-sum(expected_n)

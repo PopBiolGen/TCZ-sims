@@ -1,7 +1,8 @@
 # Script to load all background data required for TCZ sims
 
 ######## load functions and libraries ########
-source("src/pprocess_functions.R")
+source("src/pprocess_functions.R") # functions for point process model
+source("src/get-invasion-front.R") # function for bringing in current invasion front
 
 ######## load posteriors ########
 load("dat/Posteriors.RData")
@@ -60,10 +61,11 @@ rainfall.vals <- terra::extract(rainfall.raster, terra::vect(all.points))
 all.points <- all.points |>
   mutate(rainfall = rainfall.vals[[2]])
 
-## To do:
-# Bring in invasion front monitoring data as seed for forecasts
-
-
+# Bring in estimated invasion front and score east of there as colonised
+colnsd <- score_colonised(all.points)
+all.points <- colnsd$scored.points
+inv.front <- colnsd$front; rm(colnsd)
+  
 
 ####### Plot it #######
 bbox <- st_bbox(all.points)
@@ -71,6 +73,7 @@ bbox <- st_bbox(all.points)
 ggplot() +
   geom_sf(data = wa.coast, fill = NA, color = "grey30") +
   geom_sf(data = tcz.boundary, fill = NA, color = "red") +
-  geom_sf(data = all.points, aes(color = rainfall)) +
+  geom_sf(data = inv.front, color = "red", lty = 2) +
+  geom_sf(data = all.points, aes(color = colonised)) +
   coord_sf(xlim = c(bbox["xmin"], bbox["xmax"]),
            ylim = c(bbox["ymin"], bbox["ymax"]))

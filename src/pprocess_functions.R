@@ -257,7 +257,7 @@ run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) {
   output<-vector("list", length=n.sims) # vector to take outputs
   
   for (rr in 1:n.sims){ # for reps
-    cat("Rep ", rr, "\n")
+    cat("Rep ", rr, " of ", n.sims, "\n")
     lambda.samp<-10^rnorm(1, mean=sample.lambda, sd=sample.lambda.sd)
     r.samp<-10^2
     temp<-spread.pilb(pop=spread.table, gens=gens, pairs=pairs, delta=lambda.samp, r=r.samp, plot = plot, rollup = rollup)

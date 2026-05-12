@@ -25,19 +25,18 @@ load("dat/Posteriors.RData")
 #       constant.rain = NULL,
 #       trunc.dist = TRUE,
 #       TCZ = FALSE)
-# save(spread.table, pairs_pdist, file = "out/setup_kimberley.RData")
+# save(spread.table, pairs, file = "out/setup_kimberley.RData")
 # rm(k.points) #free up some memory
 # gc()
 
 load(file = "out/setup_kimberley.RData")
 
-# extend parameter space left of old priors..
-sample.lambda <- 5
+# Place some more variance on the old priors...
 sample.lambda.sd <- 2.5 * sample.lambda.sd
 
 
 # run
-for (ii in 31:40){
-  sim.set <- run_sims(n.sims = 5, gens = 14, plot = FALSE, rollup = TRUE)
+ii <- 1
+  sim.set <- run_sims(n.sims = 2000, gens = 14, plot = FALSE, rollup = TRUE)
   save_outputs(sim.set, path = "out/ABC", scenario.name = paste0("ABC_", ii), start.year = 2009, ABC = TRUE)
-}
+

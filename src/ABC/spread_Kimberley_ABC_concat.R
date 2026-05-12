@@ -37,5 +37,5 @@ samp.l.log <- log10(samp.l)
 sample.lambda <- mean(samp.l.log)
 sample.lambda.sd <- sd(samp.l.log)
 
-save(sample.lambda, sample.lambda.sd, file = "dat/Posteriors_2023.RData")
+save(sample.lambda, sample.lambda.sd, file = "dat/Posteriors_2026.RData")
 rm(list=ls())

@@ -405,52 +405,43 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
   time.to.target <- NA
   # A progress bar
   pb <- txtProgressBar(min = 0, max = gens, style = 3)
+  
+  # make full dispersal matrix under normal conditions
+  d_mat <- dcncross(pairs, u = pop[,"u"], v = pop[,"v"])/pop[, "area"]
+  d_mat[pairs > pop[, "max.dist"]] <- 0
+  d_mat <- Matrix(d_mat, sparse = TRUE) # cast across to sparse matrix
+  
   for (i in 1:gens){
-		#which sites are occupied
-		if (rollup) {
-		  occp <- pop[,"Pres"]==1 & pop[, "age"] < 4 # for large simulations, can stop processing points 4+ y colonised
-		}else {
-		  occp <- pop[,"Pres"]==1 
-		}
+    #which sites are occupied
+    if (rollup) {
+      occp <- pop[,"Pres"]==1 & pop[, "age"] < 4 # for large simulations, can stop processing points 4+ y colonised
+    }else {
+      occp <- pop[,"Pres"]==1 
+    }
     #browser()
-		lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
-		gma <- sum(lambda_t_x) # total propagules at this time step
-		pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pair matrix
-		marg_dens <- apply(pairs_t, # get probability density accruing from each source
-		                   MARGIN = 2, 
-		                   FUN = dcncross.trunc, 
-		                   u = pop[occp,"u"], 
-		                   v = pop[occp,"v"],
-		                   trunc.area = pop[occp,"area"],
-		                   trunc.dist = pop[occp,"max.dist"])
-		marg_dens <- sweep(marg_dens, # make into toad density
-		                   MARGIN = 1, 
-		                   STATS = lambda_t_x, 
-		                   FUN = "*")
-		marg_expected_n <- sweep(marg_dens, # make into expected count
-		                         MARGIN = c(1,2), 
-		                         STATS = pi*r^2, 
-		                         FUN = "*")
-		expected_n <- colSums(marg_expected_n, na.rm = TRUE) # sum contributions from all sources
-		if (gma < .Machine$integer.max){ # when we go over machine tolerance, skip draw from multinom (realised likely to be very close to expected)
-		  failures <- gma-sum(expected_n)
-		  if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
-		  expected_n <- c(expected_n, failures) # add failures
-		  realised_n <- rmultinom(1, gma, expected_n)[-length(expected_n)] # draw propagules
-		  colonised <- realised_n > 2
-		}else colonised <- expected_n > 2
-		pop[colonised, "Pres"] <- 1 #set to colonised
-		occp <- pop[,"Pres"]==1 #which sites are occupied now
-		pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
-		if (plot) plotter(pop, file.name=paste("out/", i,".png", sep=""), gen=i)
-		test.condition <- sum(pop[pop[, "target"]==1,"Pres"]) # number of target sites occupied
+    lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
+    gma <- sum(lambda_t_x) # total propagules at this time step
+    pairs_t<-d_mat[occp, , drop = FALSE] #collect relevant rows of pairwise dispersal matrix
+    expected_n <- drop(crossprod(pairs_t, lambda_t_x))*(pi*r^2) # sum density contributions from all sources and convert to expected n
+    if (gma < .Machine$integer.max){ # when we go over machine tolerance, skip draw from multinom (realised likely to be very close to expected)
+      failures <- gma-sum(expected_n)
+      if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
+      expected_n <- c(expected_n, failures) # add failures
+      realised_n <- rmultinom(1, gma, expected_n)[-length(expected_n)] # draw propagules
+      colonised <- realised_n > 2
+    }else colonised <- expected_n > 2
+    pop[colonised, "Pres"] <- 1 #set to colonised
+    occp <- pop[,"Pres"]==1 #which sites are occupied now
+    pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
+    if (plot) plotter(pop, file.name=paste("out/", i,".png", sep=""), gen=i)
+    test.condition <- sum(pop[pop[, "target"]==1,"Pres"]) # number of target sites occupied
     if (test.condition > 0 && trigger) {
       time.to.target <- i #record time of arrival
       trigger <- FALSE
     }
-		if (test.condition > 0 & test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
-		setTxtProgressBar(pb, i)
+    if (test.condition > 0 & test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
+    setTxtProgressBar(pb, i)
   }
   close(pb) # close progress bar
-	list(gen=time.to.target, popmatrix=pop)	
+  list(gen=time.to.target, popmatrix=pop)	
 }

@@ -11,7 +11,7 @@ data.dir <- file.path(Sys.getenv("DATA_PATH"), "Toads/TCZ/infrastructure")
 spatial.dir <- file.path(Sys.getenv("DATA_PATH"), "GIS - General", "GIS_layers_read_only/")
 
 ######## Load point data ########
-# load TCZ infrastructure data 
+# load TCZ infrastructure data (downloaded as geojson)
 data.dump.id <- "483d4936-3b85-41c1-bf75-eb0f0fda3c27"
 tcz.sites <- st_read(file.path(data.dir, data.dump.id, "water_point_audit.geojson")) |> 
   mutate(origin_des = "Manmade", inside_tcz = TRUE) |> 
@@ -59,6 +59,11 @@ all.points <- bind_rows(lagrange.filtered, tcz.sites)
 rainfall.vals <- terra::extract(rainfall.raster, terra::vect(all.points))
 all.points <- all.points |>
   mutate(rainfall = rainfall.vals[[2]])
+
+## To do:
+# Bring in invasion front monitoring data as seed for forecasts
+
+
 
 ####### Plot it #######
 bbox <- st_bbox(all.points)

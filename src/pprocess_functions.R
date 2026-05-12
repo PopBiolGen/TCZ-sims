@@ -5,6 +5,7 @@ library(tmaptools)
 library(magick)
 library(dplyr)
 library(ggplot2)
+library(Matrix)
 
 #The kernel
 dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
@@ -247,8 +248,7 @@ remove_spatial_duplicates <- function(pop.mat, threshold){
   cat("Removing spatial duplicates...\n")
   outList[[1]] <- outList[[1]][tooClose, tooClose] #subset pairwise matrix
   outList[[2]] <- pop.mat[tooClose,]
-  if (gc.switch) gc()
-  names(outList) <- c("pairs_pdist", "spread.table")
+  names(outList) <- c("pairs", "spread.table")
   outList
 }
 
@@ -260,7 +260,7 @@ run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) {
     cat("Rep ", rr, "\n")
     lambda.samp<-10^rnorm(1, mean=sample.lambda, sd=sample.lambda.sd)
     r.samp<-10^2
-    temp<-spread.pilb(pop=spread.table, gens=gens, pairs=pairs_pdist, delta=lambda.samp, r=r.samp, plot = plot, rollup = rollup)
+    temp<-spread.pilb(pop=spread.table, gens=gens, pairs=pairs, delta=lambda.samp, r=r.samp, plot = plot, rollup = rollup)
     temp<-c(temp, list(pars=cbind(lambda=lambda.samp, r=r.samp)))
     output[[rr]]<-temp
     gc() # cleanup memory
@@ -390,8 +390,15 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
     
     outList <- list(spread.table = spread.table, pairs = pairs_pdist)
   }
+  gc() # free up whatever memory we can before embarking on this next step
+  cat("Calculating sparse dispersal matrices... \n")
+  d_mat <- dcncross(outList$pairs, 
+                            u = outList$spread.table[,"u"], 
+                            v = outList$spread.table[,"v"])/outList$spread.table[, "area"]
+  d_mat[outList$pairs > outList$spread.table[, "max.dist"]] <- 0L
+  outList$pairs <- Matrix(d_mat, sparse = TRUE) 
   
-  cat("Placing spread table and pairwise distance matrix in: ")
+  cat("Placing spread table and dispersal matrix in: ")
   list2env(outList, envir = globalenv())
 }
 
@@ -407,9 +414,9 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
   pb <- txtProgressBar(min = 0, max = gens, style = 3)
   
   # make full dispersal matrix under normal conditions
-  d_mat <- dcncross(pairs, u = pop[,"u"], v = pop[,"v"])/pop[, "area"]
-  d_mat[pairs > pop[, "max.dist"]] <- 0
-  d_mat <- Matrix(d_mat, sparse = TRUE) # cast across to sparse matrix
+  #d_mat <- dcncross(pairs, u = pop[,"u"], v = pop[,"v"])/pop[, "area"]
+  #d_mat[pairs > pop[, "max.dist"]] <- 0
+  #d_mat <- Matrix(d_mat, sparse = TRUE) # cast across to sparse matrix
   
   for (i in 1:gens){
     #which sites are occupied
@@ -421,7 +428,7 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
     #browser()
     lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
     gma <- sum(lambda_t_x) # total propagules at this time step
-    pairs_t<-d_mat[occp, , drop = FALSE] #collect relevant rows of pairwise dispersal matrix
+    pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pairwise dispersal matrix
     expected_n <- drop(crossprod(pairs_t, lambda_t_x))*(pi*r^2) # sum density contributions from all sources and convert to expected n
     if (gma < .Machine$integer.max){ # when we go over machine tolerance, skip draw from multinom (realised likely to be very close to expected)
       failures <- gma-sum(expected_n)

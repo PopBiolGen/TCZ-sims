@@ -67,7 +67,12 @@ all.points <- all.points |>
 colnsd <- score_colonised(all.points)
 all.points <- colnsd$scored.points
 inv.front <- colnsd$front; rm(colnsd)
-  
+
+# get coordinates in albers
+albers <- all.points |> 
+  st_transform(crs = 3577) |> 
+  st_coordinates()
+all.points <- bind_cols(all.points, albers)
 
 ####### Plot it #######
 bbox <- st_bbox(all.points)

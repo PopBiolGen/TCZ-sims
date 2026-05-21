@@ -73,7 +73,7 @@ make_plots <- function(scenario.name, plot.year = TRUE) {
   # read a basemap in from ESRI
   bm <- read_osm(
     d,
-    type = "osm", # for satellite image, "esri-imagery",
+    type = "esri-topo", # for satellite image, "esri-imagery",
     zoom = 8,
     ext = 1
   )
@@ -359,7 +359,7 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   if (is.null(constant.rain)){
     u <- rain_to_days(pData[[rain.id]])
   }else {u <- rep(constant.rain, nrow(pData))}
-  
+  #browser()
   u<-fits[u, c("u", "v", "max.dist", "area")]
   if (!trunc.dist) u[, "max.dist"] <- NULL # to switch to infinite positive bounds on kernel
   

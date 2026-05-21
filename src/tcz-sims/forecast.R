@@ -26,6 +26,10 @@ setup(point.data = all.points,
 # write out points for basemapping
 write.csv(spread.table, file = "out/basemap_points.csv", row.names = FALSE)
 # run sims..
-sim_out <- run_sims(n.sims = 50, gens = 20, plot = FALSE, rollup = FALSE)
-save_outputs(output = sim_out, path = "out", scenario.name = scen.name, start.year=2026)
-make_plots(scen.name, plot.year = TRUE)
+sim_out <- run_sims(n.sims = 100, gens = 20, plot = FALSE, rollup = FALSE)
+save_outputs(output = sim_out, 
+             path = "out", 
+             scenario.name = scen.name, 
+             start.year=2025,
+             plot.time = TRUE)
+make_plots(scen.name, plot.year = TRUE, tcz.boundary = tcz.boundary)

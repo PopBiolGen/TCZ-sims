@@ -53,7 +53,7 @@ knock.out.path<-function(pdist.list, point, n.points=2, natural){
 }
 
 # function to make plots based on a scenario name
-make_plots <- function(scenario.name, plot.year = TRUE) {
+make_plots <- function(scenario.name, plot.year = TRUE, tcz.boundary = NULL) {
   in.name <- paste0("out/", scenario.name) # get filename for scenario
   ######### Make a static map of estimated arrival time #########
   # function to read point data (in Albers) and cast to sf with a CRS
@@ -81,15 +81,19 @@ make_plots <- function(scenario.name, plot.year = TRUE) {
   # replace with data to be mapped
   d <- read.point.data(paste0(in.name, ".csv"))
   
+  # optionally transform tcz.boundary to Web Mercator to match basemap
+  if (!is.null(tcz.boundary)) tcz.bm <- st_transform(tcz.boundary, 3857)
+  
   p <- tm_shape(bm,
                 unit = "km") +
     tm_rgb() +
     tm_shape(d) +
     tm_dots(size = 0.2,
-            col = "arrival",
-            breaks = 2024:2042, 
-            legend.format = list(big.mark = ""),
-            title = "Predicted year of toad arrival") 
+            fill = "arrival",
+            fill.scale = tm_scale_intervals(breaks = 2024:2042),
+            fill.legend = tm_legend(title = "Predicted year of toad arrival"))
+  
+  if (!is.null(tcz.boundary)) p <- p + tm_shape(tcz.bm) + tm_borders(col = "red", lwd = 1.5)
   
   tmap_save(p, filename = paste0("out/year-of-arrival_", scenario.name, ".pdf"))
   
@@ -104,10 +108,10 @@ make_plots <- function(scenario.name, plot.year = TRUE) {
   
   ######### Make a dynamic map of estimated arrival time #########
   fpath <- "out/dynamic_maps/"
-  input.flist <- list.files(path = fpath, pattern = ".csv")
+  input.flist <- list.files(path = fpath, pattern = "\\.csv$")
   for (yy in input.flist){
     temp <- read.point.data(fname = paste0(fpath, yy))
-    year.name <- gsub(".csv", "", yy)
+    year.name <- gsub("\\.csv$", "", yy)
     fname <- paste0(fpath, year.name, ".png")
     if (plot.year) y.name.plot <- year.name else y.name.plot <- ""
     p <- tm_shape(bm,
@@ -115,14 +119,21 @@ make_plots <- function(scenario.name, plot.year = TRUE) {
       tm_rgb() +
       tm_shape(temp) +
       tm_dots(size = 0.2,
-              col = "prob.colonised",
-              breaks = seq(0, 1, length.out = 5),
-              title = "Probability of colonisation") +
-      tm_layout(title = gsub("[^0-9]", "", y.name.plot))
+              fill = "prob.colonised",
+              fill.scale = tm_scale_intervals(breaks = seq(0, 1, length.out = 5)),
+              fill.legend = tm_legend(title = "Probability of colonisation")) +
+      tm_title(gsub("[^0-9]", "", y.name.plot))
+    if (!is.null(tcz.boundary)) p <- p + tm_shape(tcz.bm) + tm_borders(col = "red", lwd = 1.5)
     tmap_save(p, filename = fname)
   }
   
-  flist <- list.files(path = fpath, pattern = ".png")
+  flist <- list.files(path = fpath, pattern = "\\.png$")
+  
+  if (length(flist) == 0) {
+    warning("No PNG frames found in ", fpath, " — skipping animation. Were dynamic map CSVs written by save_outputs()?")
+    return(invisible(NULL))
+  }
+  
   images <- image_read(paste0(fpath, flist))
   animation <- image_animate(images, fps = 1)
   image_write(animation, path = paste0("out/dynamic_maps/animated-map_", scenario.name, ".gif"))
@@ -282,7 +293,7 @@ save_outputs <- function(output, path, scenario.name, start.year, plot.time = FA
   time.vec <- unlist(lapply(output, FUN = function(x){c(x$gen)}))
   if (plot.time & sum(is.finite(time.vec))>0) {
     pdf(file = paste0(out.name, ".pdf"))
-      hist(time.vec, xlab = "Time to the Pilbara (y)")
+      boxplot(time.vec, xlab = "Time to target (y)", horizontal = TRUE)
     dev.off()
   }
   
@@ -445,6 +456,7 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
     if (test.condition > 0 && trigger) {
       time.to.target <- i #record time of arrival
       trigger <- FALSE
+      break # stop as soon as any target sites are hit
     }
     if (test.condition > 0 & test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
     setTxtProgressBar(pb, i)

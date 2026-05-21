@@ -13,7 +13,7 @@ spatial.dir <- file.path(Sys.getenv("DATA_PATH"), "GIS - General", "GIS_layers_r
 
 ######## Load point data ########
 # load TCZ infrastructure data (downloaded as geojson)
-data.dump.id <- "483d4936-3b85-41c1-bf75-eb0f0fda3c27"
+data.dump.id <- "bfcc3664-aea2-421e-9d73-09dae5d8e423"
 tcz.sites <- st_read(file.path(data.dir, data.dump.id, "water_point_audit.geojson")) |> 
   mutate(origin_des = "Manmade", inside_tcz = TRUE) |> 
   select(-observer, -station_name, -traditional_owner_country, -whole_site_photo)

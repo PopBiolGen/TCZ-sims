@@ -8,6 +8,25 @@ score_colonised <- function(pts) {
   a <- mod1[[1]]["a",1] # inferred a
   b <- mod1[[1]]["b",1]+mean.coord["Y"] # inferred b (intercept)
   
+  ### Find a northern boundary W of the Fitzroy
+  # load a point representing the mouth of the Fitzroy that the front will have to go around
+  fp <- data.frame(lat = -17.633614, lon = 123.444807)
+  # cast this to a spatial dataframe with initial web mercator CRS, transform to albers
+  fp <- st_as_sf(fp, coords = c("lon", "lat"), crs = 4326) |> 
+    st_transform(crs = 3577)
+  # get perpendicular distance from this point to the invasion front
+  coords.fp <- st_coordinates(fp)
+  dist.to.fp <- abs((a * (coords.fp[, "X"] - mean.coord["X"]) - coords.fp[, "Y"] + b)) / sqrt(a^2 + 1)
+  # which gives us a way to get the approximate northern extent of the invasion front on W of Fitzroy
+  northern.boundary <- coords.fp[, "Y"] + dist.to.fp
+  
+  ### Get a southern boundary 
+  sp <- data.frame(lat = -18.514959, lon = 123.069856) |> 
+    st_as_sf(coords = c("lon", "lat"), crs = 4326) |> 
+    st_transform(crs = 3577) |> 
+    st_coordinates()
+  
+  ### Get our points
   init.crs <- st_crs(pts) # get original crs
   pts <- st_transform(pts, crs = 3577) # transform points to  Albers
   bb <- st_bbox(pts)
@@ -23,11 +42,11 @@ score_colonised <- function(pts) {
     )
   )
   
-  # score whether each point is east or west of line
+  # score whether each point is east or west of line, north of southern extent, and not beyond likely NW front
   coords <- st_coordinates(pts)
   
   pts$colonised <- ifelse(
-    coords[, "Y"] - a * (coords[, "X"]-mean.coord["X"]) - b > 0,
+    coords[, "Y"] - a * (coords[, "X"]-mean.coord["X"]) - b > 0 & coords[, "Y"] > sp[1,"Y"] & !(coords[, "X"] < coords.fp[1, "X"] & coords[, "Y"] > sp[1,"Y"]),
     1,  # east
     0   # west
   )

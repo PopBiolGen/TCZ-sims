@@ -40,7 +40,9 @@ rainfall.raster <- terra::rast(file.path(spatial.dir, "annual-rainfall/rdann-1.a
 tcz.boundary <- st_read(file.path(spatial.dir, "TCZ_boundary/toad_containment_zone.shp"))
 # load wa coastline poly
 wa.coast <- st_read(file.path(spatial.dir, "coast-poly_wa.shp")) |> 
-  st_transform(crs = 4326)
+  st_transform(crs = 4326) |>
+  st_make_valid() |>
+  st_intersection(old.lagrange.points |> st_transform(4326) |> st_bbox() |> st_as_sfc())
 
 ####### Merge and filter datasets #######
 # 1. Flag which lagrange points fall inside the TCZ boundary
@@ -61,7 +63,7 @@ rainfall.vals <- terra::extract(rainfall.raster, terra::vect(all.points))
 all.points <- all.points |>
   mutate(rainfall = rainfall.vals[[2]])
 
-# Bring in estimated invasion front and score east of there as colonised
+####### Bring in estimated invasion front and score colonised points #######
 colnsd <- score_colonised(all.points)
 all.points <- colnsd$scored.points
 inv.front <- colnsd$front; rm(colnsd)

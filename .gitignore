@@ -6,3 +6,5 @@ ms/*.html
 dat/
 .positai
 *.Rproj
+shiny/data/
+shiny/rsconnect/

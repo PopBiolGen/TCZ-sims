@@ -33,3 +33,6 @@ save_outputs(output = sim_out,
              start.year=2025,
              plot.time = TRUE)
 make_plots(scen.name, plot.year = TRUE, tcz.boundary = tcz.boundary)
+
+## Output data to shiny app
+source("shiny/prep_app_data.R")

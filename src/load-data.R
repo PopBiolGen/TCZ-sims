@@ -13,18 +13,59 @@ spatial.dir <- file.path(Sys.getenv("DATA_PATH"), "GIS - General", "GIS_layers_r
 
 ######## Load point data ########
 # load TCZ infrastructure data (downloaded as geojson)
-data.dump.id <- "bfcc3664-aea2-421e-9d73-09dae5d8e423"
+data.dump.id <- "089e7bef-6ea8-45d7-a819-a1c964d552fb"
 tcz.sites <- st_read(file.path(data.dir, data.dump.id, "water_point_audit.geojson")) |> 
   mutate(origin_des = "Manmade", inside_tcz = TRUE) |> 
   select(-observer, -station_name, -traditional_owner_country, -whole_site_photo)
-tcz.infrastructure <- st_read(file.path(data.dir, data.dump.id, "water_point_audit_infrastructure_item.geojson"))
+tcz.infrastructure <- st_read(
+  file.path(data.dir, 
+            data.dump.id, 
+            "water_point_audit_infrastructure_item.geojson"))
+
+# merge the two sets to apply ruleset for toad colonisable points
+temp <- left_join(tcz.sites, st_drop_geometry(tcz.infrastructure), by = "X_record_id") |> 
+  select(X_record_id, 
+         name_of_site, 
+         brief_description, 
+         infrastructure_item, 
+         overall_site_comments, 
+         fs_control_device_comment, 
+         proposed_works_at_water_point,
+         item_type,
+         controls_required,
+         new_items,
+         origin_des,
+         inside_tcz,
+         geometry)
+# identify sites with works required
+something.ss <- !vapply(temp$proposed_works_at_water_point, function(x){"A - no works required" %in% x}, FUN.VALUE = logical(1))
+# take only infrastructure with something to do and collapse back to site-level
+tcz.sites <- temp[something.ss,] |>
+  group_by(X_record_id) |>
+  summarise(
+    # Columns with consistent values — take first
+    name_of_site                  = first(name_of_site),
+    brief_description             = first(brief_description),
+    overall_site_comments         = first(overall_site_comments),
+    fs_control_device_comment     = first(fs_control_device_comment),
+    proposed_works_at_water_point = list(unique(proposed_works_at_water_point)),
+    # Columns with multiple values — collapse into list
+    infrastructure_item           = list(infrastructure_item),
+    item_type                     = list(item_type),
+    controls_required             = list(controls_required),
+    new_items                     = list(new_items),
+    origin_des                    = "Manmade" # all TCZ infrastructure points are Manmade
+  )
+
+# items that contain fences
+#fence.ss <- vapply(temp$item_type, function(x){any(c("Fence", "Gate") %in% x)}, FUN.VALUE = logical(1))
 
 # load background points (from Southwell et al)
 old.lagrange.points <- st_read(file.path(spatial.dir, "Edited-layers/merged-points_rainfall_LaGrange.shp")) |> 
   select(fcsubtype_, full_name, perennia_1, origin_des, watercou_1, area_m, st_perimet) |> 
   st_transform(4326) # switch to WGS84 to match other data sources
 
-  # read in additional points from aerial imagery ()
+# read in additional points from aerial imagery ()
 d_extra <- st_read("dat/tims_points.kml") |> 
   mutate(origin_des = "Manmade") 
   # add additional records onto old.lagrange.points
@@ -82,5 +123,13 @@ ggplot() +
   geom_sf(data = tcz.boundary, fill = NA, color = "red") +
   geom_sf(data = inv.front, color = "red", lty = 2) +
   geom_sf(data = all.points, aes(color = colonised)) +
+  coord_sf(xlim = c(bbox["xmin"], bbox["xmax"]),
+           ylim = c(bbox["ymin"], bbox["ymax"]))
+
+bbox <- st_bbox(tcz.boundary)
+ggplot() +
+  geom_sf(data = wa.coast, fill = NA, color = "grey30") +
+  geom_sf(data = tcz.boundary, fill = NA, color = "red") +
+  geom_sf(data = all.points, aes(color = origin_des)) +
   coord_sf(xlim = c(bbox["xmin"], bbox["xmax"]),
            ylim = c(bbox["ymin"], bbox["ymax"]))

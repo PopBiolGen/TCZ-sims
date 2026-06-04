@@ -65,6 +65,14 @@ old.lagrange.points <- st_read(file.path(spatial.dir, "Edited-layers/merged-poin
   select(fcsubtype_, full_name, perennia_1, origin_des, watercou_1, area_m, st_perimet) |> 
   st_transform(4326) # switch to WGS84 to match other data sources
 
+## Note the manmade points in the TCZ here ^ have been replaced by the audit
+# these old.lagrange.points also do a bad job of identifying natural waterpoints in TCZ.  Need to replace with something else
+# Living waters points make the most sense
+living.waters <- st_read(file.path(spatial.dir, "living-waters/living-waters-points.shp")) |>
+  mutate(origin_des = "Natural") |> 
+  st_transform(4326) # switch to WGS84 to match other data sources
+
+
 # read in additional points from aerial imagery ()
 d_extra <- st_read("dat/tims_points.kml") |> 
   mutate(origin_des = "Manmade") 
@@ -93,11 +101,11 @@ old.lagrange.points <- old.lagrange.points |>
 
 # 2. Remove Manmade points that are inside the TCZ
 lagrange.filtered <- old.lagrange.points |>
-  filter(!(origin_des == "Manmade" & inside_tcz))
+  filter(!inside_tcz) # remove all these points, natural and manmade
 
 # 3. Merge tcz.sites with filtered lagrange points
 # (unmatched columns will fill with NA)
-all.points <- bind_rows(lagrange.filtered, tcz.sites)
+all.points <- bind_rows(lagrange.filtered, tcz.sites, living.waters)
 
 # 4. Extract rainfall values to the merged point set
 rainfall.vals <- terra::extract(rainfall.raster, terra::vect(all.points))

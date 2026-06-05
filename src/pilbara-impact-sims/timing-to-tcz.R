@@ -1,3 +1,6 @@
+######## Note this script has been deprecated ########
+######## See tc-sims/forecast.R for latest answer to this problem ########
+
 ######## load functions and libraries ########
 source("src/pprocess_functions.R")
 

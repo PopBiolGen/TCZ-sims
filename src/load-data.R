@@ -56,6 +56,7 @@ tcz.sites <- temp[something.ss,] |>
     new_items                     = list(new_items),
     origin_des                    = "Manmade" # all TCZ infrastructure points are Manmade
   )
+rm(temp)
 
 # items that contain fences
 #fence.ss <- vapply(temp$item_type, function(x){any(c("Fence", "Gate") %in% x)}, FUN.VALUE = logical(1))
@@ -74,8 +75,18 @@ living.waters <- st_read(file.path(spatial.dir, "living-waters/living-waters-poi
 
 
 # read in additional points from aerial imagery ()
-d_extra <- st_read("dat/tims_points.kml") |> 
-  mutate(origin_des = "Manmade") 
+d_extra <- st_read(file.path(spatial.dir, "additional-waterpoints/additional-waterpoints.kml")) |> 
+  mutate(
+    origin_des = case_when(
+      # "point" in name → Manmade (catches watering point, waterpoint, etc.)
+      str_detect(Name, regex("point", ignore_case = TRUE)) ~ "Manmade",
+      # Natural water features
+      str_detect(Name, regex("lagoon|lgoon|lake|geegully|creek|seep|spring|soak|salt", ignore_case = TRUE)) ~ "Natural",
+      # Remaining manmade infrastructure
+      str_detect(Name, regex("water|dam|tank|trough|irrigat|borrow|pond|ditch|resort|homestead|campsite|station|park", ignore_case = TRUE)) ~ "Manmade",
+      TRUE ~ NA_character_
+    )
+  )
   # add additional records onto old.lagrange.points
 old.lagrange.points <- bind_rows(old.lagrange.points, d_extra)
 rm(d_extra)
@@ -105,7 +116,8 @@ lagrange.filtered <- old.lagrange.points |>
 
 # 3. Merge tcz.sites with filtered lagrange points
 # (unmatched columns will fill with NA)
-all.points <- bind_rows(lagrange.filtered, tcz.sites, living.waters)
+all.points <- bind_rows(lagrange.filtered, tcz.sites, living.waters) 
+all.points$inside_tcz <- st_within(all.points, tcz.boundary, sparse = FALSE)[, 1]
 
 # 4. Extract rainfall values to the merged point set
 rainfall.vals <- terra::extract(rainfall.raster, terra::vect(all.points))

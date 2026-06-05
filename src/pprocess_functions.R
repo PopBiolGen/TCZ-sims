@@ -3,8 +3,7 @@ library(tmap)
 library(terra)
 library(tmaptools)
 library(magick)
-library(dplyr)
-library(ggplot2)
+library(tidyverse)
 library(Matrix)
 
 #The kernel

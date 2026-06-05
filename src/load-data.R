@@ -138,18 +138,20 @@ all.points <- bind_cols(all.points, albers)
 ####### Plot it #######
 bbox <- st_bbox(all.points)
 
-ggplot() +
+time.to.tcz.fig <-ggplot() +
   geom_sf(data = wa.coast, fill = NA, color = "grey30") +
   geom_sf(data = tcz.boundary, fill = NA, color = "red") +
   geom_sf(data = inv.front, color = "red", lty = 2) +
   geom_sf(data = all.points, aes(color = colonised)) +
   coord_sf(xlim = c(bbox["xmin"], bbox["xmax"]),
            ylim = c(bbox["ymin"], bbox["ymax"]))
+ggsave(time.to.tcz.fig, path = "out/time-to-tcz.pdf")
 
 bbox <- st_bbox(tcz.boundary)
-ggplot() +
+tcz.waterpoints.fig <- ggplot() +
   geom_sf(data = wa.coast, fill = NA, color = "grey30") +
   geom_sf(data = tcz.boundary, fill = NA, color = "red") +
   geom_sf(data = all.points, aes(color = origin_des)) +
   coord_sf(xlim = c(bbox["xmin"], bbox["xmax"]),
            ylim = c(bbox["ymin"], bbox["ymax"]))
+ggsave(tcz.waterpoints.fig, path = "out/tcz-waterpoints.pdf")

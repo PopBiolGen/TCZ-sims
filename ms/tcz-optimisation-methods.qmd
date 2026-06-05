@@ -1,0 +1,35 @@
+---
+title: "TCZ-optimisation-methods"
+author: "Ben Phillips"
+format: html
+editor: visual
+---
+
+## Simulation methods
+
+### Simulation model 
+
+We make use of the simulation model of toad spread developed by Tingley et al., and updated by Southwell et al., and Dunlop et al.  The model is described in these previous papers, so we describe it here only briefly.  The model describes spread across a 2-dimensional landscape of waterpoints, where the probability of an individual moving between points is given by a truncated continuous 2-dimensional dispersal kernel, $t_n(u_n, v_n, \hat d_n)$: a 2-dimensional t-distribution, with shape and scale parameters $u$ and $v$ respectively, and a truncation distance of $\hat d_n$.
+
+The dispersal kernel parameters around each waterpoint, $i$, are determined by the mean number of rainy days (rainfall >1mm) at that waterpoint over the last 20 years.  As per Tingley et al, we assume that each day of rain equates to three days of movement, and we calculate the number of days of movement at a waterpoint, $n_i$, according to a simple union of probabilities to ensure that $n_i \leq 365$.  To estimate $u_n$ and $v_n$, we use paths of radiotelemtered free-ranging toads sampled during the wet seasons from the (then) invasion front east of Darwin in 2006-8 (Brown et al.).  For each telemetered individual path, we resampled movement distances and turning angles over $n$ days to generate a simulated dispersal distance, $d^*_n$.  For each of the XX radiotelemetered toads in the dataset, we resampled $d^*$ 10,000 times, preserving individual variation in dispersal and generating a total of XX values of $d^*_n$ for each value of $n$.  These are our simulated dispersal distributions to which we fit the n-wise kernel.  We also use these simulated distributions to determine the truncation distance, $\hat d_n$ as $1.1 \times$ the maximum simulated dispersal distance at each given $n$.
+
+The dispersal kernel around each point is converted to a population density by multiplying by the number of propagules emerging from each point, $\lambda_i$. The expected number of individuals arriving at uncolonised points is then the sum of densities accruing to that point from all colonised points.  This sum is multiplied by $\pi r^2$, where $r$ is the detection radius around each waterpoint, to give an expected number of colonists. The realised number of colonists arriving is then the outcome of a draw from a multinomial distribution (Tingley et al.).  Points where the realised number of colonists is $\geq 2$ are then considered colonised and will emit $\lambda_i$ colonists in the next time step.
+
+Tingley et al. fit this model to the spread of toads in Australia's Victoria River district using a rejection ABC algorithm and show that the invasion speed of this model is determined by $r$ and $\lambda$, but that these two parameters are essentially non-identifiable: the same speed can be given by a large $\lambda$ and small $r$ or vice versa.  Here, we take a pragmatic approach to this and simply set $r = 300$m and estimate a value of $\lambda$ given this value of $r$.  Our interest is in a model that recapitulates observed invasion history, not in estimating true biological values for these parameters.  Choosing $r = 300$ is a pragmatic choice here because it minimises overlap between areas of attraction around each waterpoint, avoiding the need for complex numerical corrections for overlap in the model.
+
+Given cane toads have now invaded the entire Kimberley since the Tingley model was first fit, we re-fit the model to the observed spread of cane toads through the Kimberley region.  This process was described in Dunlop et al. (supp. material), and provides us with a much sharper estimate of $\lambda$ than was available previously.
+
+### Estimating the timing of toad arrival at the TCZ
+
+To initialise the spread model for this questions, we used data on the location of the toad invasion as of August 2025 as a baseline from which to forecast arrival time.  The location and orientation of the invasion front in this year was very well resolved by a large set of nocturnal visual surveys across the invasion front (Phillips, Dempster, et al).  Detection probabilities are high at this time of year and so there is little uncertainty as to the estimation of the location and orientation of the front.  The northern and southern edges of the invasion were less well resolved, however.  To set the northern edge, we assumed that toads would need to negotiate around the mouth of the Fitzroy River (-17.633614, 123.444807) and their northward spread around this landscape bottleneck was at the same rate as their westward spread.  This assumption set our northern limit.  The southern limit was chosen primarily on the presence of permanent water, here we chose a southern limit by eye, at a latitude of -18.514959 degrees.  Points to the north of this and to the east of the invasion front were considered colonised (see @fig-time-to-tcz).
+
+![Permanent waterpoints in north-western Australia across which the spread model was run.  The red dashed line shows the orientation and westward extent of the toad invasion as of August 2025.  Points in blue were initialised as colonised at the beginning of model runs that were aimed at estimating the date of arrival at the top of the TCZ (shown in the red polygon).](../out/time-to-tcz.pdf){#fig-time-to-tcz}
+
+Following initialisation we ran 100 replicates of the invasion model, stopping the model when at least one of the points inside the TCZ area was colonised. This process yielded a sample of 100 simulated arrival times.
+
+### Optimising the design of the TCZ
+
+
+
+
+

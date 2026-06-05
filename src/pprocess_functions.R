@@ -435,7 +435,6 @@ spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is
     }else {
       occp <- pop[,"Pres"]==1 
     }
-    #browser()
     lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
     gma <- sum(lambda_t_x) # total propagules at this time step
     pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pairwise dispersal matrix

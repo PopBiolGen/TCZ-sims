@@ -2,9 +2,16 @@
 spread-model.Rproj
 .DS_Store
 out/
+ms/Feedback/
+ms/output/
+ms/tcz-optimisation-methods_files/
 ms/*.html
+
 dat/
 .positai
 *.Rproj
 shiny/data/
 shiny/rsconnect/
+
+/.quarto/
+**/*.quarto_ipynb

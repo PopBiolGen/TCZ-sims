@@ -22,7 +22,7 @@ score_colonised <- function(pts) {
   Y_intersect <- coords.fp[, "Y"] + num_fp / (a^2 + 1)
   
   ### Get a southern boundary 
-  sp <- data.frame(lat = -18.514959, lon = 123.069856) |> 
+  sp <- data.frame(lat = -19.06, lon = 123.069856) |> 
     st_as_sf(coords = c("lon", "lat"), crs = 4326) |> 
     st_transform(crs = 3577) |> 
     st_coordinates()
@@ -64,8 +64,11 @@ score_colonised <- function(pts) {
   
   
   # transform back to original crs
+  # densify line before transforming so the straight Albers line isn't
+  # approximated by only 2 vertices in geographic space
   pts <- st_transform(pts, crs = init.crs)
-  line <- st_transform(line, crs = init.crs)
+  line <- st_segmentize(line, dfMaxLength = 10000) |>  # 10 km intervals
+    st_transform(crs = init.crs)
   list(scored.points = pts, front = line)
 }
 

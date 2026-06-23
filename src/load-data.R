@@ -145,7 +145,7 @@ time.to.tcz.fig <-ggplot() +
   geom_sf(data = all.points, aes(color = colonised)) +
   coord_sf(xlim = c(bbox["xmin"], bbox["xmax"]),
            ylim = c(bbox["ymin"], bbox["ymax"]))
-ggsave(time.to.tcz.fig, path = "out/time-to-tcz.pdf")
+ggsave(filename = "out/time-to-tcz.png", plot = time.to.tcz.fig)
 
 bbox <- st_bbox(tcz.boundary)
 tcz.waterpoints.fig <- ggplot() +
@@ -154,4 +154,4 @@ tcz.waterpoints.fig <- ggplot() +
   geom_sf(data = all.points, aes(color = origin_des)) +
   coord_sf(xlim = c(bbox["xmin"], bbox["xmax"]),
            ylim = c(bbox["ymin"], bbox["ymax"]))
-ggsave(tcz.waterpoints.fig, path = "out/tcz-waterpoints.pdf")
+ggsave(filename = "out/tcz-waterpoints.pdf", plot = tcz.waterpoints.fig)

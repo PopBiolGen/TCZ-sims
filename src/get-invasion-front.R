@@ -16,9 +16,10 @@ score_colonised <- function(pts) {
     st_transform(crs = 3577)
   # get perpendicular distance from this point to the invasion front
   coords.fp <- st_coordinates(fp)
-  dist.to.fp <- abs((a * (coords.fp[, "X"] - mean.coord["X"]) - coords.fp[, "Y"] + b)) / sqrt(a^2 + 1)
-  # which gives us a way to get the approximate northern extent of the invasion front on W of Fitzroy
-  northern.boundary <- coords.fp[, "Y"] + dist.to.fp
+  num_fp <- a * (coords.fp[, "X"] - mean.coord["X"]) - coords.fp[, "Y"] + b
+  dist.to.fp <- abs(num_fp) / sqrt(a^2 + 1)
+  # northing of the foot of the perpendicular from fp to the invasion front
+  Y_intersect <- coords.fp[, "Y"] + num_fp / (a^2 + 1)
   
   ### Get a southern boundary 
   sp <- data.frame(lat = -18.514959, lon = 123.069856) |> 
@@ -42,13 +43,17 @@ score_colonised <- function(pts) {
     )
   )
   
-  # score whether each point is east or west of line, north of southern extent, and not beyond likely NW front
+  # score whether each point is colonised
   coords <- st_coordinates(pts)
+
+  east.of.line <- coords[, "Y"] - a * (coords[, "X"] - mean.coord["X"]) - b > 0
+  north.of.sp <- coords[, "Y"] > sp[1, "Y"]
+  east.of.fp <- coords[, "X"] > coords.fp[1, "X"]
+  north.of.intersect <- coords[, "Y"] > Y_intersect
+  dist.to.pt      <- sqrt((coords[, "X"] - coords.fp[1, "X"])^2 + (coords[, "Y"] - coords.fp[1, "Y"])^2)
   
-  pts$colonised <- ifelse(
-    coords[, "Y"] - a * (coords[, "X"]-mean.coord["X"]) - b > 0 & coords[, "Y"] > sp[1,"Y"] & !(coords[, "X"] < coords.fp[1, "X"] & coords[, "Y"] > sp[1,"Y"]),
-    1,  # east
-    0   # west
+  pts$colonised <- as.integer(
+    north.of.sp & east.of.line & (!north.of.intersect | (dist.to.pt <= dist.to.fp) | (east.of.fp & north.of.intersect))
   )
   
   # 

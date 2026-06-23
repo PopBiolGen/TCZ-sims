@@ -30,9 +30,9 @@ library(dplyr)
 library(lubridate)
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-MAX_DIST_M      <- 2000   # max distance (m) to nearest DEA polygon to be "matched"
+MAX_DIST_M      <- 1000   # max distance (m) to nearest DEA polygon to be "matched"
 MIN_OBS_PER_YEAR <- 3     # minimum valid dry-season observations to classify a year
-DRY_SEASON_MONTHS <- 4:10 # April–October (avoids monsoon cloud cover)
+DRY_SEASON_MONTHS <- 6:12 # April–October (avoids monsoon cloud cover)
 
 # ── 1. Query DEA WFS for waterbody polygons ───────────────────────────────────
 bbox <- st_bbox(living.waters)
@@ -112,10 +112,10 @@ annual_metrics <- ts_all |>
     n_obs       = n(),
     mean_pc_wet = mean(pc_wet),
     max_pc_wet  = max(pc_wet),
+    dry = any(pc_wet == 0),
     .groups = "drop"
   ) |>
-  filter(n_obs >= MIN_OBS_PER_YEAR) |>
-  mutate(dry = mean_pc_wet == 0)
+  filter(n_obs >= MIN_OBS_PER_YEAR)
 
 # ── 5. Overall drying probability per waterbody ───────────────────────────────
 drying_probs <- annual_metrics |>

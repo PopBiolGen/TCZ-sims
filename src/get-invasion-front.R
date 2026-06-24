@@ -69,7 +69,8 @@ score_colonised <- function(pts) {
   pts <- st_transform(pts, crs = init.crs)
   line <- st_segmentize(line, dfMaxLength = 10000) |>  # 10 km intervals
     st_transform(crs = init.crs)
-  list(scored.points = pts, front = line)
+  fp <- st_transform(fp, crs = init.crs)
+  list(scored.points = pts, front = line, fp = fp)
 }
 
 

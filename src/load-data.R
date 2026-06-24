@@ -124,10 +124,11 @@ rainfall.vals <- terra::extract(rainfall.raster, terra::vect(all.points))
 all.points <- all.points |>
   mutate(rainfall = rainfall.vals[[2]])
 
-####### Bring in estimated invasion front and score colonised points #######
+####### Bring in estimated invasion front and scored colonised points #######
 colnsd <- score_colonised(all.points)
 all.points <- colnsd$scored.points
-inv.front <- colnsd$front; rm(colnsd)
+inv.front <- colnsd$front
+fp <- colnsd$fp; rm(colnsd)
 
 # get coordinates in albers
 albers <- all.points |> 
@@ -142,7 +143,9 @@ time.to.tcz.fig <-ggplot() +
   geom_sf(data = wa.coast, fill = NA, color = "grey30") +
   geom_sf(data = tcz.boundary, fill = NA, color = "red") +
   geom_sf(data = inv.front, color = "red", lty = 2) +
-  geom_sf(data = all.points, aes(color = colonised)) +
+  geom_sf(data = all.points, aes(color = factor(colonised))) +
+  scale_color_manual(values = c("0" = "#132B43", "1" = "#56B1F7")) +
+  geom_sf(data = fp, color = "red") +
   coord_sf(xlim = c(bbox["xmin"], bbox["xmax"]),
            ylim = c(bbox["ymin"], bbox["ymax"]))
 ggsave(filename = "out/time-to-tcz.png", plot = time.to.tcz.fig)

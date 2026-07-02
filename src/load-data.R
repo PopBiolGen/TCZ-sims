@@ -97,9 +97,14 @@ rainfall.raster <- terra::rast(file.path(spatial.dir, "annual-rainfall/rdann-1.a
 
 ######## Load polygons ########
 # load TCZ poly
-tcz.boundary <- st_read(file.path(spatial.dir, "TCZ_boundary/toad_containment_zone.shp"))
+tcz.boundary <- st_read(file.path(spatial.dir, "TCZ_boundary/Toad_Containment_Zone_Boundary_July 26.shp"))
 # load wa coastline poly
 wa.coast <- st_read(file.path(spatial.dir, "coast-poly_wa.shp")) |> 
+  st_transform(crs = 4326) |>
+  st_make_valid() |>
+  st_intersection(old.lagrange.points |> st_transform(4326) |> st_bbox() |> st_as_sfc())
+# load pastoral boundaries
+pastoral.boundaries <- st_read(file.path(spatial.dir, "Pastoral_Stations_DPLH_083.gdb")) |> 
   st_transform(crs = 4326) |>
   st_make_valid() |>
   st_intersection(old.lagrange.points |> st_transform(4326) |> st_bbox() |> st_as_sfc())

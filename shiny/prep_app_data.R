@@ -85,6 +85,9 @@ all_points <- as.data.frame(output[[1]]$popmatrix) |>
 # ---- TCZ boundary in WGS84 ----
 tcz_wgs84 <- st_transform(tcz.boundary, 4326)
 
+# ---- Pastoral boundaries in WGS84 ----
+pastoral_wgs84 <- st_transform(pastoral.boundaries, 4326)
+
 # ---- Initial map extent: span from TCZ boundary to colonised waterpoints ----
 # Using colonised waterpoints rather than inv.front, which can have geometry
 # extending well beyond actual toad locations.
@@ -108,13 +111,14 @@ initial_bounds <- list(
 # ---- Save ----
 saveRDS(
   list(
-    prob_data      = prob_data,
-    all_points     = all_points,
-    tcz_boundary   = tcz_wgs84,
-    initial_bounds = initial_bounds,
-    years          = years,
-    n_sims         = length(output),
-    updated        = Sys.Date()
+    prob_data           = prob_data,
+    all_points          = all_points,
+    tcz_boundary        = tcz_wgs84,
+    pastoral_boundaries = pastoral_wgs84,
+    initial_bounds      = initial_bounds,
+    years               = years,
+    n_sims              = length(output),
+    updated             = Sys.Date()
   ),
   "shiny/data/app_data.rds"
 )

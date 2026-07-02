@@ -7,8 +7,9 @@ library(dplyr)
 app_data       <- readRDS("data/app_data.rds")
 prob_data      <- app_data$prob_data
 all_points     <- app_data$all_points
-tcz_boundary   <- app_data$tcz_boundary
-initial_bounds <- app_data$initial_bounds
+tcz_boundary        <- app_data$tcz_boundary
+pastoral_boundaries <- app_data$pastoral_boundaries
+initial_bounds      <- app_data$initial_bounds
 years          <- app_data$years
 n_sims         <- app_data$n_sims
 updated        <- format(app_data$updated, "%B %Y")
@@ -88,6 +89,13 @@ server <- function(input, output, session) {
         label       = "Toad Containment Zone",
         group       = "TCZ Boundary"
       ) |>
+      addPolygons(
+        data        = pastoral_boundaries,
+        color       = "#1a6faf",
+        weight      = 1,
+        fillOpacity = 0.05,
+        group       = "Pastoral Boundaries"
+      ) |>
       addLegend(
         position = "bottomright",
         pal      = pal,
@@ -96,7 +104,7 @@ server <- function(input, output, session) {
         opacity  = 0.9
       ) |>
       addLayersControl(
-        overlayGroups = "TCZ Boundary",
+        overlayGroups = c("TCZ Boundary", "Pastoral Boundaries"),
         options = layersControlOptions(collapsed = FALSE)
       ) |>
       fitBounds(

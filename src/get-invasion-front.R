@@ -5,8 +5,15 @@
 score_colonised <- function(pts) {
   # load parameters
   load(file.path(Sys.getenv("DATA_PATH"), "invasion-front-parameters.Rdata"))
-  a <- mod1[[1]]["a",1] # inferred a
-  b <- mod1[[1]]["b",1]+mean.coord["Y"] # inferred b (intercept)
+  a <- mod1[[1]]["a",1] # inferred a (slope; dimensionless, unaffected by equal scaling of X and Y)
+  b_raw <- mod1[[1]]["b",1] # inferred intercept in centred-km model space
+  
+  # mean.coord is in km (coordinates were divided by scale = 1000 before centring).
+  # Convert everything to Albers metres for use with sf geometries.
+  # In model space: y_km_centred = a * x_km_centred + b_raw
+  # In Albers metres: Y = a * (X - mean.coord_m["X"]) + b
+  mean.coord_m <- mean.coord * scale
+  b <- (b_raw + mean.coord["Y"]) * scale  # effective y-intercept in Albers metres
   
   ### Find a northern boundary W of the Fitzroy
   # load a point representing the mouth of the Fitzroy that the front will have to go around
@@ -16,7 +23,7 @@ score_colonised <- function(pts) {
     st_transform(crs = 3577)
   # get perpendicular distance from this point to the invasion front
   coords.fp <- st_coordinates(fp)
-  num_fp <- a * (coords.fp[, "X"] - mean.coord["X"]) - coords.fp[, "Y"] + b
+  num_fp <- a * (coords.fp[, "X"] - mean.coord_m["X"]) - coords.fp[, "Y"] + b
   dist.to.fp <- abs(num_fp) / sqrt(a^2 + 1)
   # northing of the foot of the perpendicular from fp to the invasion front
   Y_intersect <- coords.fp[, "Y"] + num_fp / (a^2 + 1)
@@ -32,21 +39,21 @@ score_colonised <- function(pts) {
   pts <- st_transform(pts, crs = 3577) # transform points to  Albers
   bb <- st_bbox(pts)
   
-  # make a polyline matching a, b, within the bounding box of the points
+  # make a polyline matching a, b, within the bounding box of the points (Albers metres)
   x_vals <- c(bb["xmin"], bb["xmax"])
-  y_vals <- a * (x_vals-mean.coord["X"]) + b
+  y_vals <- a * (x_vals - mean.coord_m["X"]) + b
   
   line <- st_sf(
     geometry = st_sfc(
       st_linestring(cbind(x_vals, y_vals)),
-      crs = st_crs(pts)
+      crs = 3577
     )
   )
   
   # score whether each point is colonised
   coords <- st_coordinates(pts)
 
-  east.of.line <- coords[, "Y"] - a * (coords[, "X"] - mean.coord["X"]) - b > 0
+  east.of.line <- coords[, "Y"] - a * (coords[, "X"] - mean.coord_m["X"]) - b > 0
   north.of.sp <- coords[, "Y"] > sp[1, "Y"]
   east.of.fp <- coords[, "X"] > coords.fp[1, "X"]
   north.of.intersect <- coords[, "Y"] > Y_intersect

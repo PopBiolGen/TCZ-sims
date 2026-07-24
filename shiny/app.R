@@ -162,6 +162,11 @@ ui <- page_navbar(
         " and by BHP Social Investments. Data locating the invasion front each year have been collected",
         "with the assistance of Nyikina Mangala, Karajarri, and Nyangumarta Rangers."
       ),
+      p(
+        "The app was built by ",
+        tags$a(href = "https://popbiolgenomics.org/team/ben/", target = "_blank", "Ben Phillips"),
+        ", with help from Claude AI.  It is hosted on the ARDC's Nectar Cloud."
+      ),
       
       hr(),
       h3("References"),

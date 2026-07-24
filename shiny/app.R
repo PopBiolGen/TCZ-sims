@@ -23,10 +23,24 @@ pal <- colorBin(
 )
 
 # ---- UI ----
+GA_ID <- "G-R6471VNBFP"  # <-- replace with your Measurement ID
+
 ui <- page_navbar(
   title        = "Cane Toad Forecast",
   theme        = bs_theme(bootswatch = "flatly"),
   window_title = "Cane Toad Forecast | toadfree.zone",
+  header = tags$head(
+    tags$script(
+      async = NA,
+      src = paste0("https://www.googletagmanager.com/gtag/js?id=", GA_ID)
+    ),
+    tags$script(HTML(paste0(
+      "window.dataLayer = window.dataLayer || [];
+       function gtag(){dataLayer.push(arguments);}
+       gtag('js', new Date());
+       gtag('config', '", GA_ID, "');"
+    )))
+  ),
 
   # ---- Forecast tab ----
   nav_panel(

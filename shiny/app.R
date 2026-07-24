@@ -23,51 +23,195 @@ pal <- colorBin(
 )
 
 # ---- UI ----
-ui <- page_sidebar(
-  title  = "Cane Toad Forecast",
-  theme  = bs_theme(bootswatch = "flatly"),
+ui <- page_navbar(
+  title        = "Cane Toad Forecast",
+  theme        = bs_theme(bootswatch = "flatly"),
   window_title = "Cane Toad Forecast | toadfree.zone",
 
-  sidebar = sidebar(
-    width = 310,
+  # ---- Forecast tab ----
+  nav_panel(
+    "Forecast",
+    layout_sidebar(
+      sidebar = sidebar(
+        width = 310,
 
-    sliderInput(
-      "year", label = "Year",
-      min = min(years), max = max(years),
-      value = min(years), step = 1, sep = "",
-      animate = animationOptions(interval = 900, loop = FALSE)
-    ),
+        sliderInput(
+          "year", label = "Year",
+          min = min(years), max = max(years),
+          value = min(years), step = 1, sep = "",
+          animate = animationOptions(interval = 900, loop = FALSE)
+        ),
 
-    p(class = "text-muted small",
-      "Each dot is a waterpoint. Colour shows the probability it has been",
-      "colonised by toads by the selected year, based on", n_sims,
-      "simulation replicates. Click any dot for details."
-    ),
+        p(class = "text-muted small",
+          "Each dot is a waterpoint. Colour shows the probability it has been",
+          "colonised by toads by the selected year, based on", n_sims,
+          "simulation replicates. Click any dot for details."
+        ),
 
-    hr(),
+        hr(),
 
-    # Replace href with your Mailchimp signup page URL
-    tags$a(
-      href = "https://YOUR-MAILCHIMP-SIGNUP-URL",
-      target = "_blank",
-      class = "btn btn-primary w-100 mb-3",
-      icon("envelope"), " Get annual forecast updates"
-    ),
+        # Replace href with your Mailchimp signup page URL
+        tags$a(
+          href = "https://YOUR-MAILCHIMP-SIGNUP-URL",
+          target = "_blank",
+          class = "btn btn-primary w-100 mb-3",
+          icon("envelope"), " Get annual forecast updates"
+        ),
 
-    hr(),
+        hr(),
 
-    p(class = "text-muted small",
-      "Forecast last updated: ", strong(updated), ".",
-      br(),
-      tags$a(href = "https://toadfree.zone", target = "_blank",
-             "toadfree.zone")
+        p(class = "text-muted small",
+          "Forecast last updated: ", strong(updated), ".",
+          br(),
+          tags$a(href = "https://toadfree.zone", target = "_blank",
+                 "toadfree.zone")
+        )
+      ),
+
+      card(
+        full_screen = TRUE,
+        padding = 0,
+        leafletOutput("map", height = "780px")
+      )
     )
   ),
 
-  card(
-    full_screen = TRUE,
-    padding = 0,
-    leafletOutput("map", height = "780px")
+  # ---- About tab ----
+  nav_panel(
+    "About",
+    div(
+      class = "container py-4",
+      style = "max-width: 860px;",
+
+      h2("About this forecast"),
+
+      p(
+        "This tool shows a probabilistic forecast of cane toad spread towards Broome and into",
+        "the Pilbara region of Western Australia. The coloured dots on the map",
+        "represent known waterpoints, and the colour of each dot shows the",
+        "likelihood that toads will have reached that waterpoint by the year",
+        "you select. The forecast is based on a computer simulation model that",
+        "has been fitted to — and validated against — the real history of toad",
+        "spread across northern Australia."
+      ),
+
+      h3("How the spread model works"),
+
+      h4("Waterpoints are the key"),
+      p(
+        "Cane toads cannot survive thoe northern dry season without water. In seasonally arid",
+        "landscapes like the southern Kimberley and Pilbara, water is found at discrete",
+        "points — bores, tanks, dams, springs, and rock holes — scattered",
+        "across an otherwise dry landscape. The model treats these waterpoints",
+        "as stepping stones. Toads establish at a waterpoint and survive there over the dry season.",
+        "The next wet season they breed nearby and then",
+        "the young toads disperse outward.  If they are lucky, they find another waterpoint to survive the next dry season."
+      ),
+
+      h4("Rainfall drives how far toads move"),
+      p(
+        "How far toads can disperse in a given year depends on rainfall.",
+        "More rainy days means more nights of active movement, and so toads",
+        "can travel further. The model uses the average number of rainy days",
+        "recorded at each waterpoint over the past 20 years to estimate a",
+        "\"dispersal kernel\" — essentially a probability map of how likely a",
+        "toad starting at one waterpoint is to reach any other waterpoint",
+        "during a wet season. This dispersal kernel was calibrated using",
+        "GPS-tracked toads from the invasion front near Darwin."
+      ),
+
+      h4("Colonisation is a numbers game"),
+      p(
+        "Once we know how far toads are likely to travel, the model works out",
+        "how many toads are expected to arrive at each unoccupied waterpoint",
+        "from all the occupied waterpoints around it. A waterpoint is",
+        "considered colonised when at least two toads arrive — one toad alone",
+        "cannot establish a breeding population. Once colonised, a waterpoint",
+        "becomes a new source of dispersing toads in the following wet season."
+      ),
+
+      h4("Many simulations give us probabilities"),
+      p(
+        "Toad spread is not perfectly predictable — there is genuine randomness",
+        "in how many toads arrive at any given point in any given year.",
+        "To capture this uncertainty, the model is run many times (", n_sims,
+        "replicates), each time with slightly different random outcomes for",
+        "dispersal and colonisation. The colour on the map reflects the",
+        "fraction of those runs in which a given waterpoint was colonised by",
+        "the selected year. A waterpoint shown in dark red was reached in",
+        "nearly every simulation run; a yellow waterpoint was reached in only",
+        "a small proportion of runs."
+      ),
+
+      h4("Model fitting and initialisation"),
+      p(
+        "The model was originally developed using data on toad spread through",
+        "the Victoria River District and the Kimberley. We re-fitted it to",
+        "the observed spread across the Kimberley, which gives a more precise",
+        "estimate of how fast and how readily toads move through this type of",
+        "landscape. The forecast shown here is initialised each year from the latest known",
+        "position of the toad invasion front, as mapped by",
+        "nocturnal surveys across the front."
+      ),
+
+      hr(),
+      h3("Acknowledgements"),
+      p(
+        "This website is supported by the SKIP Foundation, the Western Australian Government’s",
+        "Department of Energy and Economic Diversification (through the Premier’s Science Fellowship Program),",
+        " and by BHP Social Investments. Data locating the invasion front each year have been collected",
+        "with the assistance of Nyikina Mangala, Karajarri, and Nyangumarta Rangers."
+      ),
+      
+      hr(),
+      h3("References"),
+
+      tags$ul(
+        class = "list-unstyled",
+        style = "line-height: 1.8;",
+
+        tags$li(
+          style = "margin-bottom: 0.8em;",
+          "Dunlop, J., von Takach, B., Dempster, T., Jolly, C. J., Letnic, M.,",
+          "Lohr, C., Shine, R., Ward-Fear, G., Webb, J. K., Woinarski, J. C. Z.,",
+          "& Phillips, B. L. (2025). Quantifying the potential impact of the cane",
+          "toad (", tags$em("Rhinella marina"), ") on biodiversity in Australia's",
+          "Pilbara region.", tags$em("Scientific Reports"), ", ", tags$em("15"), "(1), 37566.",
+          tags$a(href = "https://doi.org/10.1038/s41598-025-24017-4",
+                 target = "_blank", "https://doi.org/10.1038/s41598-025-24017-4")
+        ),
+
+        tags$li(
+          style = "margin-bottom: 0.8em;",
+          "Southwell, D., Tingley, R., Bode, M., Nicholson, E., & Phillips, B. (2017).",
+          "Cost and feasibility of a barrier to halt the spread of invasive cane toads",
+          "in arid Australia: Incorporating expert knowledge into model-based",
+          "decision-making.", tags$em("Journal of Applied Ecology"), ", ",
+          tags$em("54"), "(1), 216–224.",
+          tags$a(href = "https://doi.org/10.1111/1365-2664.12744",
+                 target = "_blank", "https://doi.org/10.1111/1365-2664.12744")
+        ),
+
+        tags$li(
+          style = "margin-bottom: 0.8em;",
+          "Tingley, R., Phillips, B. L., Letnic, M., Brown, G. P., Shine, R.,",
+          "& Baird, S. J. E. (2013). Identifying optimal barriers to halt the",
+          "invasion of cane toads ", tags$em("Rhinella marina"), " in arid Australia.",
+          tags$em("Journal of Applied Ecology"), ", ", tags$em("50"), ", 129–137.",
+          tags$a(href = "https://doi.org/10.1111/1365-2664.12021",
+                 target = "_blank", "https://doi.org/10.1111/1365-2664.12021")
+        )
+      ),
+
+      hr(),
+
+      p(
+        class = "text-muted small",
+        "Forecast last updated: ", strong(updated), ". ",
+        tags$a(href = "https://toadfree.zone", target = "_blank",
+               "toadfree.zone")
+      )
+    )
   )
 )
 

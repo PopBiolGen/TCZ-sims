@@ -5,7 +5,7 @@ source("src/pprocess_functions.R") # functions for point process model
 source("src/get-invasion-front.R") # function for bringing in current invasion front
 
 ######## load posteriors ########
-load("dat/Posteriors.RData")
+load("dat/Posteriors_2026.RData")
 
 ######## define the data directories ########
 data.dir <- file.path(Sys.getenv("DATA_PATH"), "Toads/TCZ/infrastructure")
@@ -21,6 +21,53 @@ tcz.infrastructure <- st_read(
   file.path(data.dir, 
             data.dump.id, 
             "water_point_audit_infrastructure_item.geojson"))
+
+# load costing data
+## Total costs
+total.cost <- readxl::read_xlsx(path = file.path(data.dir, "Activity Steps Toad project - 4 crew - 9Jul26.xlsx"),
+                                sheet = "Analysis") |> 
+  select('Total Cost') |> 
+  slice(1) |> 
+  unlist()
+## Site-level costs
+tcz.costs <- readxl::read_xlsx(path = file.path(data.dir, "Activity Steps Toad project - 4 crew - 9Jul26.xlsx"),
+                               sheet = "Activity Steps Toad project",
+                               skip = 1) |> 
+  filter(!is.na(Activity))
+names(tcz.costs) <- tolower(make.names(names(tcz.costs)))
+tcz.costs <- tcz.costs |> 
+  group_by(activity) |> 
+  summarise(site.id = first(activity.id),
+            site = first(activity),
+            effort = first(site.duration)) |> 
+  mutate(cost = effort/sum(effort) * total.cost)
+#### To Do ####
+# merge costs to infrastructure
+normalize_name <- function(x) {
+  x |>
+    gsub("\u2019|\u2018", "'", x = _) |>   # curly single quotes → straight
+    gsub("\u201C|\u201D", '"', x = _) |>   # curly double quotes → straight
+    trimws() |>
+    tolower()
+}
+
+costs_for_join <- tcz.costs |>
+  mutate(activity = recode(activity,
+    "Anna Plains Homestead Perimeter Fence and Gates" = "Anna Plains Homestead",
+    "Eeganah well king brown well"                    = "Eeganah well \"king brown well\"",
+    "Gilbert 2"                                       = "Gilberts 2",
+    "Herbs 1"                                         = "Herb's 1",
+    "No.5"                                            = "No. 5",
+    "Wotans Bore"                                     = "Wotens bore",
+    "Yard bore - Nita"                                = "Yard bore"
+  )) |>
+  mutate(.key = normalize_name(activity)) |>
+  select(.key, cost)
+
+tcz.sites <- tcz.sites |>
+  mutate(.key = normalize_name(name_of_site)) |>
+  left_join(costs_for_join, by = ".key") |>
+  select(-.key)
 
 # merge the two sets to apply ruleset for toad colonisable points
 temp <- left_join(tcz.sites, st_drop_geometry(tcz.infrastructure), by = "X_record_id") |> 
@@ -66,7 +113,7 @@ old.lagrange.points <- st_read(file.path(spatial.dir, "Edited-layers/merged-poin
   select(fcsubtype_, full_name, perennia_1, origin_des, watercou_1, area_m, st_perimet) |> 
   st_transform(4326) # switch to WGS84 to match other data sources
 
-## Note the manmade points in the TCZ here ^ have been replaced by the audit
+## Note the manmade points in the TCZ here ^ have been replaced by the audit in tcz.sites
 # these old.lagrange.points also do a bad job of identifying natural waterpoints in TCZ.  Need to replace with something else
 # Living waters points make the most sense
 living.waters <- st_read(file.path(spatial.dir, "living-waters/living-waters-points.shp")) |>

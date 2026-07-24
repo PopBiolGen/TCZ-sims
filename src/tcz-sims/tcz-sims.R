@@ -2,7 +2,7 @@
 # to test various control scenarios for efficacy and optimise investment in control interventions
 
 ######## load functions and libraries ########
-source("src/load-data.R")
+source("src/tcz-sims/load-data.R")
 
 ######## filter to TCZ region ########
 # buffer TCZ by 80km (project to Albers for metric distances, then back)

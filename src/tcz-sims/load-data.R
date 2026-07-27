@@ -2,7 +2,7 @@
 
 ######## load functions and libraries ########
 source("src/pprocess_functions.R") # functions for point process model
-source("src/get-invasion-front.R") # function for bringing in current invasion front
+source("src/tcz-sims/get-invasion-front.R") # function for bringing in current invasion front
 
 ######## load posteriors ########
 load("dat/Posteriors_2026.RData")
@@ -17,10 +17,10 @@ data.dump.id <- "089e7bef-6ea8-45d7-a819-a1c964d552fb"
 tcz.sites <- st_read(file.path(data.dir, data.dump.id, "water_point_audit.geojson")) |> 
   mutate(origin_des = "Manmade", inside_tcz = TRUE) |> 
   select(-observer, -station_name, -traditional_owner_country, -whole_site_photo)
-tcz.infrastructure <- st_read(
-  file.path(data.dir, 
-            data.dump.id, 
-            "water_point_audit_infrastructure_item.geojson"))
+# tcz.infrastructure <- st_read(
+#   file.path(data.dir, 
+#             data.dump.id, 
+#             "water_point_audit_infrastructure_item.geojson"))
 
 # load costing data
 ## Total costs
@@ -69,41 +69,41 @@ tcz.sites <- tcz.sites |>
   left_join(costs_for_join, by = ".key") |>
   select(-.key)
 
-# merge the two sets to apply ruleset for toad colonisable points
-temp <- left_join(tcz.sites, st_drop_geometry(tcz.infrastructure), by = "X_record_id") |> 
-  select(X_record_id, 
-         name_of_site, 
-         brief_description, 
-         infrastructure_item, 
-         overall_site_comments, 
-         fs_control_device_comment, 
-         proposed_works_at_water_point,
-         item_type,
-         controls_required,
-         new_items,
-         origin_des,
-         inside_tcz,
-         geometry)
-# identify sites with works required
-something.ss <- !vapply(temp$proposed_works_at_water_point, function(x){"A - no works required" %in% x}, FUN.VALUE = logical(1))
-# take only infrastructure with something to do and collapse back to site-level
-tcz.sites <- temp[something.ss,] |>
-  group_by(X_record_id) |>
-  summarise(
-    # Columns with consistent values — take first
-    name_of_site                  = first(name_of_site),
-    brief_description             = first(brief_description),
-    overall_site_comments         = first(overall_site_comments),
-    fs_control_device_comment     = first(fs_control_device_comment),
-    proposed_works_at_water_point = list(unique(proposed_works_at_water_point)),
-    # Columns with multiple values — collapse into list
-    infrastructure_item           = list(infrastructure_item),
-    item_type                     = list(item_type),
-    controls_required             = list(controls_required),
-    new_items                     = list(new_items),
-    origin_des                    = "Manmade" # all TCZ infrastructure points are Manmade
-  )
-rm(temp)
+# merge the site and infrastructure sets to apply ruleset for toad colonisable points
+# temp <- left_join(tcz.sites, st_drop_geometry(tcz.infrastructure), by = "X_record_id") |> 
+#   select(X_record_id, 
+#          name_of_site, 
+#          brief_description, 
+#          infrastructure_item, 
+#          overall_site_comments, 
+#          fs_control_device_comment, 
+#          proposed_works_at_water_point,
+#          item_type,
+#          controls_required,
+#          new_items,
+#          origin_des,
+#          inside_tcz,
+#          geometry)
+# # identify sites with works required
+# something.ss <- !vapply(temp$proposed_works_at_water_point, function(x){"A - no works required" %in% x}, FUN.VALUE = logical(1))
+# # take only infrastructure with something to do and collapse back to site-level
+# tcz.sites <- temp[something.ss,] |>
+#   group_by(X_record_id) |>
+#   summarise(
+#     # Columns with consistent values — take first
+#     name_of_site                  = first(name_of_site),
+#     brief_description             = first(brief_description),
+#     overall_site_comments         = first(overall_site_comments),
+#     fs_control_device_comment     = first(fs_control_device_comment),
+#     proposed_works_at_water_point = list(unique(proposed_works_at_water_point)),
+#     # Columns with multiple values — collapse into list
+#     infrastructure_item           = list(infrastructure_item),
+#     item_type                     = list(item_type),
+#     controls_required             = list(controls_required),
+#     new_items                     = list(new_items),
+#     origin_des                    = "Manmade" # all TCZ infrastructure points are Manmade
+#   )
+# rm(temp)
 
 # items that contain fences
 #fence.ss <- vapply(temp$item_type, function(x){any(c("Fence", "Gate") %in% x)}, FUN.VALUE = logical(1))

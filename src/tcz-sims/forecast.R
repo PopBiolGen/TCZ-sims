@@ -1,7 +1,7 @@
 # Script to run sims from the current invasion front, until the tcz is reached
 
 ######## load functions and libraries ########
-source("src/load-data.R")
+source("src/tcz-sims/load-data.R")
 
 ######## define target points ########
 all.points <- all.points |>

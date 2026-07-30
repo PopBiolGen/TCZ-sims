@@ -6,6 +6,22 @@ library(magick)
 library(tidyverse)
 library(Matrix)
 
+# Control-type codes used by the (optional) control step in spread.pilb().
+# CONTROL_NONE is the default for every point unless a scenario opts in via setup()'s
+# control.type.id argument -- this keeps the control step a strict no-op for existing scripts.
+CONTROL_NONE  <- 0L
+CONTROL_TANK  <- 1L
+CONTROL_FENCE <- 2L
+
+# maps a character control-type column ("none"/"tank"/"fence", case-insensitive) onto the
+# numeric codes above; unmatched or NA values fall back to CONTROL_NONE
+encode_control_type <- function(x){
+  code <- c(none = CONTROL_NONE, tank = CONTROL_TANK, fence = CONTROL_FENCE)
+  out <- unname(code[tolower(as.character(x))])
+  out[is.na(out)] <- CONTROL_NONE
+  out
+}
+
 #The kernel
 dcncross<-function(x, u, v) {  #cauchy-normal distribution in 2D
   (u^v*v*sqrt(v^v*(u^2*v+x^2)^(-2-v)))/(2*pi)
@@ -263,14 +279,17 @@ remove_spatial_duplicates <- function(pop.mat, threshold){
 }
 
 # function that will run sims on whatever has been thrown into environment by setup()
-run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) { 
+run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup,
+                      control.step = FALSE, stop.on.target = TRUE, drying.matrix = NULL) {
+  if (control.step && rollup) stop("rollup and control.step cannot both be TRUE -- control-step scenarios must process every site every generation")
   output<-vector("list", length=n.sims) # vector to take outputs
-  
+
   for (rr in 1:n.sims){ # for reps
     cat("Rep ", rr, " of ", n.sims, "\n")
     lambda.samp<-10^rnorm(1, mean=sample.lambda, sd=sample.lambda.sd)
     r.samp<-10^2
-    temp<-spread.pilb(pop=spread.table, gens=gens, pairs=pairs, delta=lambda.samp, r=r.samp, plot = plot, rollup = rollup)
+    temp<-spread.pilb(pop=spread.table, gens=gens, pairs=pairs, delta=lambda.samp, r=r.samp, plot = plot, rollup = rollup,
+                       control.step = control.step, stop.on.target = stop.on.target, drying.matrix = drying.matrix)
     temp<-c(temp, list(pars=cbind(lambda=lambda.samp, r=r.samp)))
     output[[rr]]<-temp
     gc() # cleanup memory
@@ -278,7 +297,7 @@ run_sims <- function(n.sims = 100, gens, plot = FALSE, rollup) {
 output
 }
 
-save_outputs <- function(output, path, scenario.name, start.year, plot.time = FALSE, ABC = FALSE){
+save_outputs <- function(output, path, scenario.name, start.year, plot.time = FALSE, ABC = FALSE, extinction.aware = FALSE){
   ######## save output and generate summaries ########
   # time to arrive at target
   out.name <- paste0(path, "/", scenario.name) # make filename for scenario
@@ -301,7 +320,13 @@ save_outputs <- function(output, path, scenario.name, start.year, plot.time = FA
   add_index_column <- function(x, index) { # Function to add index column to each matrix
     mat <- x$popmatrix[x$popmatrix[, "age"] > 0, ] # remove points never colonised
     index_col <- rep(index, n = nrow(mat))
-    arrival <- round(start.year+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
+    if (extinction.aware) {
+      # first.col.gen is a direct record of first-colonisation generation, immune to the gaps in
+      # `age` that occur once a point can go extinct and later recolonise
+      arrival <- round(start.year + mat[, "first.col.gen"])
+    } else {
+      arrival <- round(start.year+max(mat[, "age"])-mat[, "age"]) # calculate arrival year
+    }
     cbind(index_col, mat, arrival)
   }
   # Apply the function to each element of the list using lapply
@@ -344,9 +369,15 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   observations = NULL,
                   remove_duplicates = TRUE,
                   threshold = 100, # metres within which to filter out duplicates
-                  constant.rain = NULL, # else number of days you want across whole area 
+                  constant.rain = NULL, # else number of days you want across whole area
                   trunc.dist = TRUE, # false for full kernel
-                  TCZ = FALSE # implement the TCZ, or not?
+                  TCZ = FALSE, # implement the TCZ, or not?
+                  control.type.id = NULL, # name of a character column ("none"/"tank"/"fence") -- enables the control step
+                  fence.area.id = NULL, # name of a column giving fenced-polygon area (m^2, Albers)
+                  fence.units.id = NULL, # name of a column giving km-of-fenceline + gate count ("g" in the qmd)
+                  fence.breach.rate = 0.05, # assumed per-km-of-fenceline/gate breach rate
+                  nat.surv.prob.id = NULL, # name of a column giving per-point natural survival probability (1 - drying prob)
+                  control.fail.prob.id = NULL # name of a column overriding the default annual control-defeat probability
 ){
   cat("Loading kernel parameters...\n")
   load("dat/Kernel-fits_truncated.RData")
@@ -378,7 +409,42 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
   pData[[present.id]][is.na(pData[[present.id]])] <- 0 # set NAs to 0
   tg <- pData[[present.id]]==2 # identify target sites
   pData[[present.id]][pData[[present.id]]==2] <- 0 # re-set targetted sites to 0
-  
+
+  nats_vec <- as.numeric(pData[[artificial.natural.id]]==0)
+
+  cat("Assigning control-step parameters to waterpoints...\n")
+  n.pts <- nrow(pData)
+  # control type: defaults to CONTROL_NONE for everyone unless control.type.id is supplied;
+  # natural points can never carry an artificial control type
+  control.type <- if (!is.null(control.type.id)) encode_control_type(pData[[control.type.id]]) else rep(CONTROL_NONE, n.pts)
+  control.type[!is.na(nats_vec) & nats_vec==1] <- CONTROL_NONE
+
+  # fenced-area effective detection radius (circle of equal area to the fenced polygon)
+  fence.area <- if (!is.null(fence.area.id)) pData[[fence.area.id]] else rep(NA_real_, n.pts)
+  r.eff <- ifelse(control.type==CONTROL_FENCE & !is.na(fence.area), sqrt(fence.area/pi), NA_real_)
+
+  # fence breach probability, from km-of-fenceline + gate count ("g" in the qmd)
+  fence.units <- if (!is.null(fence.units.id)) pData[[fence.units.id]] else rep(0, n.pts)
+  fence.units[is.na(fence.units)] <- 0
+  p.breach <- ifelse(control.type==CONTROL_FENCE, 1-(1-fence.breach.rate)^(fence.units/4), 0)
+
+  # natural-point survival probability (1 - drying probability); static default of 1 (always survives)
+  # until a real per-point/per-year drying model is wired in
+  surv.prob <- if (!is.null(nat.surv.prob.id)) pData[[nat.surv.prob.id]] else rep(1, n.pts)
+  surv.prob[is.na(surv.prob)] <- 1
+
+  # annual control-defeat probability for tanks/fences, overridable per-row
+  control.fail.prob.default <- ifelse(control.type==CONTROL_TANK, 0.01,
+                                ifelse(control.type==CONTROL_FENCE, 0.05, 0))
+  control.fail.prob <- if (!is.null(control.fail.prob.id)) {
+    cfp <- pData[[control.fail.prob.id]]
+    ifelse(is.na(cfp), control.fail.prob.default, cfp)
+  } else control.fail.prob.default
+
+  # bookkeeping columns, always present regardless of control-step usage
+  occ.years <- pData[[present.id]] # mirrors age's initial value: 1 for already-colonised points, 0 otherwise
+  first.col.gen <- ifelse(pData[[present.id]]==1, 0, NA_real_)
+
   spread.table <-  cbind(ID = 1:nrow(pData),
                          X = pData[[X.id]],
                          Y = pData[[Y.id]],
@@ -386,7 +452,15 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                          u = u,
                          Pres = pData[[present.id]], # replace 2 from target with 0
                          age = pData[[present.id]], # set already colonised to age = 1
-                         nats = as.numeric(pData[[artificial.natural.id]]==0))
+                         nats = nats_vec,
+                         control.type = control.type,
+                         r.eff = r.eff,
+                         fence.units = fence.units,
+                         p.breach = p.breach,
+                         surv.prob = surv.prob,
+                         control.fail.prob = control.fail.prob,
+                         occ.years = occ.years,
+                         first.col.gen = first.col.gen)
   
   if (!is.null(observations)){ # does nothing if NULL, else vector of column names
     spread.table <- cbind(spread.table, obs = as.matrix(pData[observations]))
@@ -417,48 +491,109 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 # spreads the population over gens generations or until target sites are reached
 # returns number of generations
 # target is a vector of rows of pop that contain targets
-spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup){ #pairs is a list from pdist.fast  
+spread.pilb<-function(pop, gens, pairs, delta, r, plot=FALSE, rollup,
+                       control.step=FALSE, # opt-in within-timestep control/extinction step
+                       stop.on.target=TRUE, # FALSE to keep running the full horizon after a target breach (for point-years accounting)
+                       drying.matrix=NULL # optional gens x n matrix of natural drying probabilities, refreshed into surv.prob each generation
+                       ){ #pairs is a list from pdist.fast
+  if (control.step && rollup) stop("rollup and control.step cannot both be TRUE -- control-step scenarios must process every site every generation")
+  if (control.step){
+    required.cols <- c("control.type", "r.eff", "fence.units", "p.breach", "surv.prob", "control.fail.prob", "occ.years", "first.col.gen")
+    missing.cols <- setdiff(required.cols, colnames(pop))
+    if (length(missing.cols) > 0) stop("control.step=TRUE requires spread.table columns built via setup()'s control-step arguments; missing: ", paste(missing.cols, collapse=", "))
+  }
   trigger <- TRUE # to catch time to first arrival in pilbara
   time.to.target <- NA
   # A progress bar
   pb <- txtProgressBar(min = 0, max = gens, style = 3)
-  
+
+  # point-specific detection radius: fenced areas use r.eff (inflated to the fenced polygon's
+  # effective radius), everything else falls back to the global scalar r
+  r_vec <- if ("r.eff" %in% colnames(pop)) ifelse(is.na(pop[,"r.eff"]), r, pop[,"r.eff"]) else r
+
+  if (control.step){ # static per-point masks, computed once (control.type/nats never change during the run)
+    is.fence <- pop[,"control.type"]==CONTROL_FENCE
+    is.tank.or.fence <- pop[,"control.type"] %in% c(CONTROL_TANK, CONTROL_FENCE) # tank and fence resolve identically at the control step (see below)
+    is.nat   <- pop[,"nats"]==1
+  }
+
   # make full dispersal matrix under normal conditions
   #d_mat <- dcncross(pairs, u = pop[,"u"], v = pop[,"v"])/pop[, "area"]
   #d_mat[pairs > pop[, "max.dist"]] <- 0
   #d_mat <- Matrix(d_mat, sparse = TRUE) # cast across to sparse matrix
-  
+
   for (i in 1:gens){
+    pres.before <- pop[,"Pres"]==1 # snapshot at generation start, used by the control step below
     #which sites are occupied
     if (rollup) {
       occp <- pop[,"Pres"]==1 & pop[, "age"] < 4 # for large simulations, can stop processing points 4+ y colonised
     }else {
-      occp <- pop[,"Pres"]==1 
+      occp <- pop[,"Pres"]==1
     }
     lambda_t_x <- rpois(sum(occp), delta) # stochastic propagules from occupied site x time t
     gma <- sum(lambda_t_x) # total propagules at this time step
     pairs_t<-pairs[occp, , drop = FALSE] #collect relevant rows of pairwise dispersal matrix
-    expected_n <- drop(crossprod(pairs_t, lambda_t_x))*(pi*r^2) # sum density contributions from all sources and convert to expected n
-    if (gma < .Machine$integer.max){ # when we go over machine tolerance, skip draw from multinom (realised likely to be very close to expected)
+    expected_n <- drop(crossprod(pairs_t, lambda_t_x))*(pi*r_vec^2) # sum density contributions from all sources and convert to expected n
+    if (gma == 0){ # no propagules produced this generation (rmultinom errors on an all-zero probability vector)
+      colonised <- rep(FALSE, nrow(pop))
+    } else if (gma < .Machine$integer.max){ # when we go over machine tolerance, skip draw from multinom (realised likely to be very close to expected)
       failures <- gma-sum(expected_n)
       if(failures<0) failures<-0 # catches the approximately statement (primarily happens at large r)
       expected_n <- c(expected_n, failures) # add failures
       realised_n <- rmultinom(1, gma, expected_n)[-length(expected_n)] # draw propagules
+      if (control.step){ # fence's own stopping power thins arrivals at not-yet-colonised fenced points
+        fence.uncol <- is.fence & !pres.before
+        if (any(fence.uncol)) realised_n[fence.uncol] <- rbinom(sum(fence.uncol), size=realised_n[fence.uncol], prob=1-pop[fence.uncol,"p.breach"])
+      }
       colonised <- realised_n > 2
-    }else colonised <- expected_n > 2
+    }else {
+      if (control.step){
+        fence.uncol <- is.fence & !pres.before
+        if (any(fence.uncol)) expected_n[fence.uncol] <- expected_n[fence.uncol]*(1-pop[fence.uncol,"p.breach"])
+      }
+      colonised <- expected_n > 2
+    }
     pop[colonised, "Pres"] <- 1 #set to colonised
-    occp <- pop[,"Pres"]==1 #which sites are occupied now
+
+    if (control.step){ # control step: colonised points of a controlled type may be knocked back to
+      # uncolonised this generation; every occupied point of a controlled type is re-tested fresh
+      # each generation, regardless of when it was first colonised
+      occ.now <- pop[,"Pres"]==1
+      nat.idx <- is.nat & occ.now
+      if (any(nat.idx)){
+        if (!is.null(drying.matrix)) pop[nat.idx, "surv.prob"] <- 1 - drying.matrix[i, nat.idx]
+        survives <- rbinom(sum(nat.idx), 1, pop[nat.idx, "surv.prob"])
+        pop[which(nat.idx)[survives==0], "Pres"] <- 0
+      }
+      # control.fail.prob is P(control fails, i.e. toads persist) -- so P(extinguished) = 1-control.fail.prob.
+      # Tank and fence resolve identically here (only their route into colonisation differs: fences
+      # are breach-thinned at the colonisation step above), so both are drawn in one rbinom() call
+      # over their per-row control.fail.prob values.
+      control.idx <- is.tank.or.fence & occ.now
+      if (any(control.idx)){
+        persists <- rbinom(sum(control.idx), 1, pop[control.idx, "control.fail.prob"])
+        pop[which(control.idx)[persists==0], "Pres"] <- 0
+      }
+    }
+
+    occp <- pop[,"Pres"]==1 #which sites are occupied now (post-control, when applicable)
     pop[occp, "age"] <- pop[occp, "age"] + 1 # age each of the colonised populations
+    # occ.years/first.col.gen are updated unconditionally (not gated on control.step): with no
+    # extinction ever occurring, occ.years stays numerically identical to age, and first.col.gen
+    # simply records each point's one-and-only colonisation generation
+    pop[occp, "occ.years"] <- pop[occp, "occ.years"] + 1 # cumulative point-years occupied, gap-tolerant across extinction/recolonisation
+    first.col.new <- occp & !pres.before & is.na(pop[,"first.col.gen"])
+    pop[first.col.new, "first.col.gen"] <- i # stamped once, never overwritten on later recolonisation
     if (plot) plotter(pop, file.name=paste("out/", i,".png", sep=""), gen=i)
     test.condition <- sum(pop[pop[, "target"]==1,"Pres"]) # number of target sites occupied
     if (test.condition > 0 && trigger) {
       time.to.target <- i #record time of arrival
       trigger <- FALSE
-      break # stop as soon as any target sites are hit
+      if (stop.on.target) break # stop as soon as any target sites are hit
     }
-    if (test.condition > 0 & test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
+    if (stop.on.target && test.condition > 0 & test.condition == sum(pop[, "target"]==1)) break # stop if all target points colonised
     setTxtProgressBar(pb, i)
   }
   close(pb) # close progress bar
-  list(gen=time.to.target, popmatrix=pop)	
+  list(gen=time.to.target, popmatrix=pop)
 }

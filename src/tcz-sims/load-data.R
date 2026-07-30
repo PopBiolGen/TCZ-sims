@@ -32,9 +32,14 @@ tcz.costs <- readxl::read_xlsx(path = file.path(data.dir, "optimisation-data/TCZ
   select(1:6)
 names(tcz.costs) <- tolower(make.names(names(tcz.costs)))
 
+## Fence lengths for long fencing areas
+fence.lengths <- readxl::read_xlsx(path = file.path(data.dir, "optimisation-data/Draft QRA data - Fencing unit rates.xlsx"),
+                               sheet = "fence-lengths")
+
 # merge costs to infrastructure
 tcz.sites <- tcz.sites |>
-  left_join(tcz.costs, by = join_by(X_record_id == parentid)) 
+  left_join(tcz.costs, by = join_by(X_record_id == parentid)) |> 
+  left_join(fence.lengths |> select(Site.ID, distance), by = join_by(X_record_id == Site.ID))
 
 # load background points (from Southwell et al)
 old.lagrange.points <- st_read(file.path(spatial.dir, "Edited-layers/merged-points_rainfall_LaGrange.shp")) |> 

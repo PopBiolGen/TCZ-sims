@@ -12,101 +12,29 @@ data.dir <- file.path(Sys.getenv("DATA_PATH"), "Toads/TCZ/infrastructure")
 spatial.dir <- file.path(Sys.getenv("DATA_PATH"), "GIS - General", "GIS_layers_read_only/")
 
 ######## Load point data ########
-# load TCZ infrastructure data (downloaded as geojson)
+# load TCZ site data (downloaded as geojson)
 data.dump.id <- "089e7bef-6ea8-45d7-a819-a1c964d552fb"
 tcz.sites <- st_read(file.path(data.dir, data.dump.id, "water_point_audit.geojson")) |> 
   mutate(origin_des = "Manmade", inside_tcz = TRUE) |> 
   select(-observer, -station_name, -traditional_owner_country, -whole_site_photo)
-# tcz.infrastructure <- st_read(
-#   file.path(data.dir, 
-#             data.dump.id, 
-#             "water_point_audit_infrastructure_item.geojson"))
 
 # load costing data
 ## Total costs
-total.cost <- readxl::read_xlsx(path = file.path(data.dir, "Activity Steps Toad project - 4 crew - 9Jul26.xlsx"),
+total.cost <- readxl::read_xlsx(path = file.path(data.dir, "optimisation-data/TCZ Price per site - Post PCR001.xlsx"),
                                 sheet = "Analysis") |> 
   select('Total Cost') |> 
   slice(1) |> 
   unlist()
 ## Site-level costs
-tcz.costs <- readxl::read_xlsx(path = file.path(data.dir, "Activity Steps Toad project - 4 crew - 9Jul26.xlsx"),
-                               sheet = "Activity Steps Toad project",
-                               skip = 1) |> 
-  filter(!is.na(Activity))
+tcz.costs <- readxl::read_xlsx(path = file.path(data.dir, "optimisation-data/TCZ Price per site - Post PCR001.xlsx"),
+                               sheet = "Analysis") |> 
+  filter(!is.na(ParentID)) |> 
+  select(1:6)
 names(tcz.costs) <- tolower(make.names(names(tcz.costs)))
-tcz.costs <- tcz.costs |> 
-  group_by(activity) |> 
-  summarise(site.id = first(activity.id),
-            site = first(activity),
-            effort = first(site.duration)) |> 
-  mutate(cost = effort/sum(effort) * total.cost)
-#### To Do ####
+
 # merge costs to infrastructure
-normalize_name <- function(x) {
-  x |>
-    gsub("\u2019|\u2018", "'", x = _) |>   # curly single quotes → straight
-    gsub("\u201C|\u201D", '"', x = _) |>   # curly double quotes → straight
-    trimws() |>
-    tolower()
-}
-
-costs_for_join <- tcz.costs |>
-  mutate(activity = recode(activity,
-    "Anna Plains Homestead Perimeter Fence and Gates" = "Anna Plains Homestead",
-    "Eeganah well king brown well"                    = "Eeganah well \"king brown well\"",
-    "Gilbert 2"                                       = "Gilberts 2",
-    "Herbs 1"                                         = "Herb's 1",
-    "No.5"                                            = "No. 5",
-    "Wotans Bore"                                     = "Wotens bore",
-    "Yard bore - Nita"                                = "Yard bore"
-  )) |>
-  mutate(.key = normalize_name(activity)) |>
-  select(.key, cost)
-
 tcz.sites <- tcz.sites |>
-  mutate(.key = normalize_name(name_of_site)) |>
-  left_join(costs_for_join, by = ".key") |>
-  select(-.key)
-
-# merge the site and infrastructure sets to apply ruleset for toad colonisable points
-# temp <- left_join(tcz.sites, st_drop_geometry(tcz.infrastructure), by = "X_record_id") |> 
-#   select(X_record_id, 
-#          name_of_site, 
-#          brief_description, 
-#          infrastructure_item, 
-#          overall_site_comments, 
-#          fs_control_device_comment, 
-#          proposed_works_at_water_point,
-#          item_type,
-#          controls_required,
-#          new_items,
-#          origin_des,
-#          inside_tcz,
-#          geometry)
-# # identify sites with works required
-# something.ss <- !vapply(temp$proposed_works_at_water_point, function(x){"A - no works required" %in% x}, FUN.VALUE = logical(1))
-# # take only infrastructure with something to do and collapse back to site-level
-# tcz.sites <- temp[something.ss,] |>
-#   group_by(X_record_id) |>
-#   summarise(
-#     # Columns with consistent values — take first
-#     name_of_site                  = first(name_of_site),
-#     brief_description             = first(brief_description),
-#     overall_site_comments         = first(overall_site_comments),
-#     fs_control_device_comment     = first(fs_control_device_comment),
-#     proposed_works_at_water_point = list(unique(proposed_works_at_water_point)),
-#     # Columns with multiple values — collapse into list
-#     infrastructure_item           = list(infrastructure_item),
-#     item_type                     = list(item_type),
-#     controls_required             = list(controls_required),
-#     new_items                     = list(new_items),
-#     origin_des                    = "Manmade" # all TCZ infrastructure points are Manmade
-#   )
-# rm(temp)
-
-# items that contain fences
-#fence.ss <- vapply(temp$item_type, function(x){any(c("Fence", "Gate") %in% x)}, FUN.VALUE = logical(1))
+  left_join(tcz.costs, by = join_by(X_record_id == parentid)) 
 
 # load background points (from Southwell et al)
 old.lagrange.points <- st_read(file.path(spatial.dir, "Edited-layers/merged-points_rainfall_LaGrange.shp")) |> 

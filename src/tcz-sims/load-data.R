@@ -156,6 +156,9 @@ pastoral.boundaries <- st_read(file.path(spatial.dir, "Pastoral_Stations_DPLH_08
   st_make_valid() |>
   st_intersection(old.lagrange.points |> st_transform(4326) |> st_bbox() |> st_as_sfc())
 
+# write out trimmed pastoral boundaries for use elsewhere
+st_write(pastoral.boundaries, "out/pastoral-boundaries.shp", append = FALSE)
+
 ####### Merge and filter datasets #######
 # 1. Flag which lagrange points fall inside the TCZ boundary
 inside_tcz <- st_within(old.lagrange.points, tcz.boundary, sparse = FALSE)[, 1]

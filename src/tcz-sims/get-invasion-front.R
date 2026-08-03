@@ -63,7 +63,7 @@ score_colonised <- function(pts) {
   fp.reached <- num_fp < 0
 
   pts$colonised <- as.integer(
-    north.of.sp & east.of.line &
+    north.of.sp & east.of.line & (east.of.fp | fp.reached) &
       (!fp.reached | !north.of.intersect | (dist.to.pt <= dist.to.fp) | (east.of.fp & north.of.intersect))
   )
   
@@ -149,7 +149,7 @@ score_colonised_multi_year <- function(pts, diagnostic_plot = FALSE) {
     fp.reached <- num_fp < 0
 
     colonised.k <- as.logical(
-      north.of.sp & east.of.line &
+      north.of.sp & east.of.line & (east.of.fp | fp.reached) &
         (!fp.reached | !north.of.intersect | (dist.to.pt <= dist.to.fp) | (east.of.fp & north.of.intersect))
     )
 

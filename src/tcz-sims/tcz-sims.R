@@ -30,8 +30,15 @@ all.points <- all.points |>
       pt_y < tcz_bbox[["ymin"]] ~ 2L,  # south of TCZ → target points
       TRUE ~ colonised
     ),
-    origin_des = (origin_des == "Natural") # to match logical required of setup()
-  ) |> 
+    origin_des = (origin_des == "Natural"), # to match logical required of setup()
+    control.type = case_when(
+      within_tcz & !origin_des & !is.na(distance) ~ "fence", # matched fence-lengths sheet
+      within_tcz & !origin_des                     ~ "tank",  # manmade, TCZ, no fence record
+      TRUE                                          ~ "none"  # natural, or outside TCZ
+    ),
+    fence.units = coalesce(distance, 0) / 1000 + coalesce(n.gates, 0), # distance is metres -> km, + gate count
+    fence.area = if_else(control.type == "fence", (distance / 4)^2, NA_real_) # distance = full perimeter (m); assume square -> side = distance/4, area = side^2
+  ) |>
   rename(TCZ = inside_tcz) # to match required name in setup()
 
 # Plot to make sure all is as it should be
@@ -73,15 +80,19 @@ setup(point.data = all.points,
       threshold = 100,
       constant.rain = NULL,
       trunc.dist = TRUE,
-      TCZ = TRUE)
+      TCZ = TRUE,
+      control.type.id = "control.type",
+      fence.area.id = "fence.area",
+      fence.units.id = "fence.units")
 
 # write out points for basemapping
 write.csv(spread.table, file = "out/basemap_points.csv", row.names = FALSE)
 # run sims..
-sim_out <- run_sims(n.sims = 100, gens = 20, plot = FALSE, rollup = FALSE)
-save_outputs(output = sim_out, 
-             path = "out", 
-             scenario.name = scen.name, 
+sim_out <- run_sims(n.sims = 100, gens = 50, plot = FALSE, rollup = FALSE, control.step = TRUE)
+save_outputs(output = sim_out,
+             path = "out",
+             scenario.name = scen.name,
              start.year=2032,
-             plot.time = TRUE)
+             plot.time = TRUE,
+             extinction.aware = TRUE)
 make_plots(scen.name, plot.year = TRUE, tcz.boundary = tcz.boundary)

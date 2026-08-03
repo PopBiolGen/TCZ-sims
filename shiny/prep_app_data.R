@@ -20,16 +20,21 @@ load("out/forecast.RData")
 cat("Processing", length(output), "simulation replicates.\n")
 
 # ---- Extract per-simulation arrival years ----
+# Uses first.col.gen (generation a point was first colonised, relative to start.year) rather
+# than back-solving from age/max.age: this is the same value setup()/spread.pilb() already
+# maintain, and -- unlike the age-based calc -- it correctly carries a real historical
+# colonisation year for points that were already colonised at forecast start (see
+# setup()'s col.year.id/start.year args in pprocess_functions.R), instead of collapsing them
+# all to start.year.
 arrivals_list <- lapply(seq_along(output), function(i) {
   mat <- as.data.frame(output[[i]]$popmatrix)
   mat <- mat[mat$age > 0, ]
   if (nrow(mat) == 0) return(NULL)
-  max.age <- max(mat$age)
   data.frame(
     ID      = mat$ID,
     X       = mat$X,
     Y       = mat$Y,
-    arrival = round(start.year + max.age - mat$age)
+    arrival = round(start.year + mat$first.col.gen)
   )
 })
 all_arrivals <- bind_rows(arrivals_list)
@@ -117,6 +122,7 @@ saveRDS(
     pastoral_boundaries = pastoral_wgs84,
     initial_bounds      = initial_bounds,
     years               = years,
+    start_year          = start.year,
     n_sims              = length(output),
     updated             = Sys.Date()
   ),

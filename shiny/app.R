@@ -11,6 +11,7 @@ tcz_boundary        <- app_data$tcz_boundary
 pastoral_boundaries <- app_data$pastoral_boundaries
 initial_bounds      <- app_data$initial_bounds
 years          <- app_data$years
+start_year     <- if (!is.null(app_data$start_year)) app_data$start_year else min(years)
 n_sims         <- app_data$n_sims
 updated        <- format(app_data$updated, "%B %Y")
 
@@ -151,7 +152,9 @@ server <- function(input, output, session) {
           "<b>Waterpoint</b><br>",
           "Probability colonised by <b>", yr, "</b>: ",
           "<b>", round(prob * 100), "%</b><br>",
-          "Median expected arrival year: <b>", mean_arrival, "</b>"
+          ifelse(mean_arrival <= start_year,
+                 paste0("Colonised since: <b>", mean_arrival, "</b>"),
+                 paste0("Median expected arrival year: <b>", mean_arrival, "</b>"))
         )
       )
   })

@@ -13,8 +13,8 @@ load("dat/Posteriors_2026.RData")
 
 ######## tcz-arrival scenario ########
 scen.name <- "forecast"
-setup(point.data = all.points, 
-      X.id = "X", 
+setup(point.data = all.points,
+      X.id = "X",
       Y.id = "Y",
       present.id = "colonised",
       artificial.natural.id = "origin_des",
@@ -22,16 +22,19 @@ setup(point.data = all.points,
       threshold = 100,
       constant.rain = NULL,
       trunc.dist = TRUE,
-      TCZ = FALSE)
+      TCZ = FALSE,
+      col.year.id = "colonisation_year",
+      start.year = 2025)
 # write out points for basemapping
 write.csv(spread.table, file = "out/basemap_points.csv", row.names = FALSE)
 # run sims..
 sim_out <- run_sims(n.sims = 100, gens = 20, plot = FALSE, rollup = FALSE)
-save_outputs(output = sim_out, 
-             path = "out", 
-             scenario.name = scen.name, 
+save_outputs(output = sim_out,
+             path = "out",
+             scenario.name = scen.name,
              start.year=2025,
-             plot.time = TRUE)
+             plot.time = TRUE,
+             extinction.aware = TRUE)
 make_plots(scen.name, plot.year = TRUE, tcz.boundary = tcz.boundary)
 
 ## Output data to shiny app

@@ -377,7 +377,9 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
                   fence.units.id = NULL, # name of a column giving km-of-fenceline + gate count ("g" in the qmd)
                   fence.breach.rate = 0.05, # assumed per-km-of-fenceline/gate breach rate
                   nat.surv.prob.id = NULL, # name of a column giving per-point natural survival probability (1 - drying prob)
-                  control.fail.prob.id = NULL # name of a column overriding the default annual control-defeat probability
+                  control.fail.prob.id = NULL, # name of a column overriding the default annual control-defeat probability
+                  col.year.id = NULL, # name of a column giving each point's known historical colonisation year (NA if unknown/not colonised)
+                  start.year = NULL # forecast start year; required when col.year.id is supplied, to convert a colonisation year into a generation offset
 ){
   cat("Loading kernel parameters...\n")
   load("dat/Kernel-fits_truncated.RData")
@@ -443,7 +445,16 @@ setup <- function(point.data = "dat/art_nat_clp.csv",
 
   # bookkeeping columns, always present regardless of control-step usage
   occ.years <- pData[[present.id]] # mirrors age's initial value: 1 for already-colonised points, 0 otherwise
-  first.col.gen <- ifelse(pData[[present.id]]==1, 0, NA_real_)
+  if (!is.null(col.year.id) && is.null(start.year)) stop("start.year is required when col.year.id is supplied")
+  first.col.gen <- if (!is.null(col.year.id)) {
+    # known historical colonisation year, expressed as a generation offset from start.year
+    # (negative = colonised before the forecast start); falls back to 0 where col.year.id is NA
+    # for an already-colonised point (e.g. left-censored/unknown), matching prior behaviour
+    col.year <- pData[[col.year.id]]
+    ifelse(pData[[present.id]]==1, ifelse(is.na(col.year), 0, col.year - start.year), NA_real_)
+  } else {
+    ifelse(pData[[present.id]]==1, 0, NA_real_)
+  }
 
   spread.table <-  cbind(ID = 1:nrow(pData),
                          X = pData[[X.id]],

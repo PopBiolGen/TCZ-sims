@@ -112,10 +112,10 @@ rainfall.vals <- terra::extract(rainfall.raster, terra::vect(all.points))
 all.points <- all.points |>
   mutate(rainfall = rainfall.vals[[2]])
 
-####### Bring in estimated invasion front and scored colonised points #######
-colnsd <- score_colonised(all.points)
-all.points <- colnsd$scored.points
-inv.front <- colnsd$front
+####### Bring in estimated invasion front(s) and scored colonised points #######
+colnsd <- score_colonised_multi_year(all.points)
+all.points <- colnsd$scored.points # includes colonised (0/1) and colonisation_year
+inv.front <- colnsd$fronts # one front line per modelled year
 fp <- colnsd$fp; rm(colnsd)
 
 # get coordinates in albers
@@ -130,7 +130,7 @@ bbox <- st_bbox(all.points)
 time.to.tcz.fig <-ggplot() +
   geom_sf(data = wa.coast, fill = NA, color = "grey30") +
   geom_sf(data = tcz.boundary, fill = NA, color = "red") +
-  geom_sf(data = inv.front, color = "red", lty = 2) +
+  geom_sf(data = inv.front, aes(group = factor(year)), color = "red", lty = 2) +
   geom_sf(data = all.points, aes(color = factor(colonised))) +
   scale_color_manual(values = c("0" = "#132B43", "1" = "#56B1F7")) +
   geom_sf(data = fp, color = "red") +

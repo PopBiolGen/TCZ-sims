@@ -9,14 +9,13 @@
 # bbox.fit, mean.coord, scale, years.all) to already exist in $DATA_PATH --
 # produced by (re-)running that script in invasion-front-monitoring.
 #
-# Design notes (see conversation history / data-requirements.md-style discussion):
+# Notes:
 # - The starting front for year k is fixed at its posterior mean (a, b_k) -- not
 #   resampled per rep -- so the resulting spread of b_sim across reps reflects only
 #   the stochastic spread process (propagule draws, colonisation draws, lambda
 #   resampling in run_sims()), not front-location uncertainty. That's compared
 #   against the empirical delta[k] posterior, which instead reflects detection-data
-#   uncertainty -- these are two different kinds of uncertainty, not directly
-#   poolable, and should be presented as such.
+#   uncertainty -- these are two different kinds of uncertainty.
 # - b_sim is recovered per rep via a deterministic misclassification-minimising
 #   threshold on the simulated Pres pattern (fit_b_threshold()), not a smooth
 #   logistic fit -- this matches the deterministic step-function front definition
@@ -170,8 +169,8 @@ names(null.results) <- sim.years
 ######## assemble comparison data and plot ########
 comparison.df <- do.call(rbind, lapply(null.results, function(x) {
   rbind(
-    data.frame(year = x$year, source = "empirical", distance_km = x$empirical),
-    data.frame(year = x$year, source = "simulated (null)", distance_km = x$sim[!is.na(x$sim)])
+    data.frame(year = x$year, source = "empirical", distance_km = abs(x$empirical)),
+    data.frame(year = x$year, source = "simulated (null)", distance_km = abs(x$sim[!is.na(x$sim)]))
   )
 }))
 

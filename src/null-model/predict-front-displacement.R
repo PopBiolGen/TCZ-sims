@@ -30,6 +30,43 @@
 ######## load functions, libraries, and point data ########
 source("src/tcz-sims/load-data.R") # produces all.points (colonisation_year, Albers X/Y already attached)
 
+# replace old.lagrange.points with points from a different geographic area, 
+# to cover area covered by toad monitoring surveys plus an 80km buffer all around.
+# Get survey point bounding box, in Albers.  Note, invasion front analysis needs to be run first, 
+# and its repo needs to be sitting in same parent directory as this repo.
+load(file = "../invasion-front-monitoring/out/merged-visual-surveys.RData")
+survey.point.bbox <- df |> 
+  st_transform(crs = 3577) |> 
+  st_bbox() |> 
+  st_as_sfc(bb) |>  # convert to polygon
+  st_buffer(dist = 80000) # buffer by 80km
+
+# replace all.points with the relevant set of waterpoints from combined waterpoint data
+all.points <- st_read(file.path(spatial.dir, "Edited-layers/merged-points.shp")) |> 
+  select(fcsubtype_, full_name, perennia_1, origin_des, watercou_1, area_m, st_perimet) |> 
+  st_transform(crs = 4326) |>
+  bind_rows(d_extra) |> # add additional points from aerial imagery
+  bind_rows(df |> select(full_name = location_n, geometry)) |>  # add additional points from on-ground surveys
+  st_transform(crs = 3577) |>
+  st_filter(survey.point.bbox, .predicate = st_within)
+  
+rainfall.vals <- terra::extract(rainfall.raster, terra::vect(all.points))
+all.points <- all.points |>
+  mutate(rainfall = rainfall.vals[[2]])
+
+####### Bring in estimated invasion front(s) and scored colonised points #######
+colnsd <- score_colonised_multi_year(all.points)
+all.points <- colnsd$scored.points # includes colonised (0/1) and colonisation_year
+inv.front <- colnsd$fronts # one front line per modelled year
+fp <- colnsd$fp; rm(colnsd)
+
+# get coordinates in albers
+albers <- all.points |> 
+  st_transform(crs = 3577) |> 
+  st_coordinates()
+all.points <- bind_cols(all.points, albers)
+
+
 ######## load simulation posteriors ########
 load("dat/Posteriors_2026.RData")
 
@@ -106,7 +143,7 @@ kept.ids <- spread.table[, "ID"]
 
 ######## years to simulate forward from (every year except the last has a "next year") ########
 sim.years <- years.all[-length(years.all)]
-n.sims <- 200 # sim reps per year -- raise for a smoother null distribution (runtime scales linearly)
+n.sims <- 100 # sim reps per year -- raise for a smoother null distribution (runtime scales linearly)
 
 null.results <- vector("list", length(sim.years))
 
@@ -193,3 +230,4 @@ if (any(degen > 0)) {
   cat("\nDegenerate (whole-bbox-one-sided) reps by year:\n")
   print(setNames(degen, sim.years))
 }
+

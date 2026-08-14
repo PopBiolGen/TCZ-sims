@@ -69,7 +69,7 @@ d_extra <- st_read(file.path(spatial.dir, "additional-waterpoints/additional-wat
   )
   # add additional records onto old.lagrange.points
 old.lagrange.points <- bind_rows(old.lagrange.points, d_extra)
-rm(d_extra)
+
 
 ######## Load rasters ########
 # load rainfall data (Number of days where at least 1mm of rain falls)

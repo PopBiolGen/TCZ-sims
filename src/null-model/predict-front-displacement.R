@@ -30,16 +30,70 @@
 ######## load functions, libraries, and point data ########
 source("src/tcz-sims/load-data.R") # produces all.points (colonisation_year, Albers X/Y already attached)
 
-# replace old.lagrange.points with points from a different geographic area, 
-# to cover area covered by toad monitoring surveys plus an 80km buffer all around.
-# Get survey point bounding box, in Albers.  Note, invasion front analysis needs to be run first, 
-# and its repo needs to be sitting in same parent directory as this repo.
+######## load empirical front parameters (produced by invasion-front-monitoring) ########
+# Moved up from its original position (after all.points/survey.point.bbox construction) --
+# survey.point.bbox below needs a/mean.coord_m/b_metres() to build a front-relative cutoff.
+load(file.path(Sys.getenv("DATA_PATH"), "invasion-front-parameters-multi-year.Rdata"))
+# objects brought into scope: mod.multi, post.samples, bbox.fit, mean.coord, scale, years.all, run.info
+
+a <- mod.multi[[1]]["a", 1]        # posterior-mean slope (shared across years, fixed across reps)
+mean.coord_m <- mean.coord * scale # mean.coord (km, model space) -> Albers metres
+
+# posterior-mean b (Albers metres) for years.all[tt] -- same transform score_colonised_multi_year() uses
+b_metres <- function(tt) {
+  b_raw <- mod.multi[[1]][paste0("b[", tt, "]"), 1]
+  (b_raw + mean.coord["Y"]) * scale
+}
+b1 <- b_metres(1) # earliest modelled year's intercept, used to build survey.point.bbox below
+
+# replace old.lagrange.points with points from a different geographic area, to cover the area
+# covered by toad monitoring surveys plus an 80km buffer -- except on the already-colonised
+# (east) side, where the boundary follows a line parallel to the invasion front's axis, 80km
+# (perpendicular) behind the earliest modelled front (years.all[1]). A plain axis-aligned bbox
+# buffer can't guarantee uniform perpendicular clearance from a diagonal front (slope `a`); this
+# does. West/north/south sides aren't reported as problematic and keep the original 80km buffer.
+# Note, invasion front analysis needs to be run first, and its repo needs to be sitting in same
+# parent directory as this repo.
 load(file = "../invasion-front-monitoring/out/merged-visual-surveys.RData")
-survey.point.bbox <- df |> 
-  st_transform(crs = 3577) |> 
-  st_bbox() |> 
-  st_as_sfc(bb) |>  # convert to polygon
-  st_buffer(dist = 80000) # buffer by 80km
+survey.bb <- df |>
+  st_transform(crs = 3577) |>
+  st_bbox()
+
+# west/north/south: original 80km axis-aligned buffer. East side left generously unconstrained
+# (1000km) -- irrelevant once intersected with front.cutoff.poly below (that's always the
+# binding edge in practice), so its exact value doesn't need tuning.
+survey.box <- st_bbox(c(xmin = survey.bb[["xmin"]] - 80000,
+                         ymin = survey.bb[["ymin"]] - 80000,
+                         xmax = survey.bb[["xmax"]] + 1e6,
+                         ymax = survey.bb[["ymax"]] + 80000),
+                       crs = 3577) |>
+  st_as_sfc()
+
+# front-relative cutoff: half-plane D <= b1.offset, D = Y - a*(X - meanX_m) (score_colonised()'s
+# convention: colonised iff D > b). b1.offset shifts b1 80km into colonised (increasing-D)
+# territory: a perpendicular offset `dist` in D-space is `dist * sqrt(1+a^2)` (same conversion
+# used later in this script for disp.sim.km).
+b1.offset <- b1 + 80000 * sqrt(1 + a^2)
+
+# Offset line D = b1.offset, built generously far along the front's axis (u = X - meanX_m).
+# singleSide buffers give the LEFT side of the line's direction of travel for positive dist,
+# RIGHT for negative (?st_buffer). For a line traversed in the direction of increasing u (tangent
+# (1,a)), the left-hand normal is (-a,1) == grad(D) (D's increasing direction) -- so the *right*
+# side (negative dist) is the decreasing-D/uncolonised-ish side we want, for any sign of `a`.
+u.vals <- c(-2e6, 2e6) # +/-2000km along the front's axis -- generously covers WA
+front.offset.line <- st_linestring(cbind(mean.coord_m[["X"]] + u.vals,
+                                          a * u.vals + b1.offset))
+front.cutoff.poly <- st_sfc(front.offset.line, crs = 3577) |>
+  st_buffer(dist = -2e6, singleSide = TRUE, endCapStyle = "FLAT")
+
+survey.point.bbox <- st_intersection(survey.box, front.cutoff.poly)
+stopifnot(length(survey.point.bbox) > 0, !st_is_empty(survey.point.bbox))
+# essentially all df survey points should fall inside the final box -- if not, something is
+# badly wrong with the cutoff direction/parameters, not just a few points on a tight edge
+n.survey.outside <- sum(!st_within(st_transform(df, crs = 3577), survey.point.bbox, sparse = FALSE))
+if (n.survey.outside > 0) {
+  warning(n.survey.outside, " of ", nrow(df), " survey points fall outside survey.point.bbox")
+}
 
 # replace all.points with the relevant set of waterpoints from combined waterpoint data
 all.points <- st_read(file.path(spatial.dir, "Edited-layers/merged-points.shp")) |> 
@@ -69,19 +123,6 @@ all.points <- bind_cols(all.points, albers)
 
 ######## load simulation posteriors ########
 load("dat/Posteriors_2026.RData")
-
-######## load empirical front parameters (produced by invasion-front-monitoring) ########
-load(file.path(Sys.getenv("DATA_PATH"), "invasion-front-parameters-multi-year.Rdata"))
-# objects brought into scope: mod.multi, post.samples, bbox.fit, mean.coord, scale, years.all, run.info
-
-a <- mod.multi[[1]]["a", 1]        # posterior-mean slope (shared across years, fixed across reps)
-mean.coord_m <- mean.coord * scale # mean.coord (km, model space) -> Albers metres
-
-# posterior-mean b (Albers metres) for years.all[tt] -- same transform score_colonised_multi_year() uses
-b_metres <- function(tt) {
-  b_raw <- mod.multi[[1]][paste0("b[", tt, "]"), 1]
-  (b_raw + mean.coord["Y"]) * scale
-}
 
 ## Make a static figure here to show selected points, and the invasion front lines on a map.
 dir.create("out/null-model", showWarnings = FALSE)

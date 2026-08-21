@@ -65,9 +65,8 @@ ui <- page_navbar(
 
         hr(),
 
-        # Replace href with your Mailchimp signup page URL
         tags$a(
-          href = "https://YOUR-MAILCHIMP-SIGNUP-URL",
+          href = "https://www.surveymonkey.com/r/BJ8YV9H",
           target = "_blank",
           class = "btn btn-primary w-100 mb-3",
           icon("envelope"), " Get annual forecast updates"

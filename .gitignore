@@ -12,6 +12,7 @@ dat/
 *.Rproj
 shiny/data/
 shiny/rsconnect/
+shiny/site/
 
 /.quarto/
 **/*.quarto_ipynb

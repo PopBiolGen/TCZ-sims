@@ -74,6 +74,63 @@ ui <- page_sidebar(
 # ---- Server ----
 server <- function(input, output, session) {
 
+  # The slider's value isn't available on the very first server pass under
+  # shinylive/webR (R renders before the browser's inputs arrive), so fall back
+  # to the first year rather than passing NULL into the filter below.
+  current_year <- reactive({
+    y <- input$year
+    if (length(y) != 1 || is.na(y)) min(years) else y
+  })
+
+  # Draw the two waterpoint layers for a given year onto either the initial
+  # `leaflet()` map or a `leafletProxy()`. Both accept the same add*/clearGroup
+  # verbs, so one helper covers both call sites.
+  #
+  # The initial draw MUST happen inside renderLeaflet() (below), not only from an
+  # observer: a leafletProxy() call can race the map widget's first render and be
+  # dropped, which under shinylive/webR happens every time -- the map then shows
+  # boundaries but no points until the slider is touched.
+  draw_points <- function(map, yr) {
+    d <- prob_data[prob_data$year == yr & prob_data$prob > 0, , drop = FALSE]
+
+    map |>
+      # Grey background dots (every waterpoint), year-specific popup
+      clearGroup("background") |>
+      addCircleMarkers(
+        data        = all_points,
+        lng         = ~lon,
+        lat         = ~lat,
+        radius      = 3,
+        fillColor   = "#aaaaaa",
+        fillOpacity = 0.4,
+        stroke      = FALSE,
+        group       = "background",
+        popup       = paste0(
+          "<b>Waterpoint</b><br>",
+          "Probability colonised by <b>", yr, "</b>: <b>0%</b>"
+        )
+      ) |>
+      clearGroup("points") |>
+      addCircleMarkers(
+        data        = d,
+        lng         = ~lon,
+        lat         = ~lat,
+        radius      = 4,
+        fillColor   = ~pal(prob),
+        fillOpacity = 0.85,
+        stroke      = FALSE,
+        group       = "points",
+        popup       = ~paste0(
+          "<b>Waterpoint</b><br>",
+          "Probability colonised by <b>", yr, "</b>: ",
+          "<b>", round(prob * 100), "%</b><br>",
+          ifelse(mean_arrival <= start_year,
+                 paste0("Colonised since: <b>", mean_arrival, "</b>"),
+                 paste0("Median expected arrival year: <b>", mean_arrival, "</b>"))
+        )
+      )
+  }
+
   output$map <- renderLeaflet({
     leaflet() |>
       addProviderTiles(
@@ -112,50 +169,15 @@ server <- function(input, output, session) {
         lat1 = initial_bounds$lat1,
         lng2 = initial_bounds$lng2,
         lat2 = initial_bounds$lat2
-      )
+      ) |>
+      draw_points(isolate(current_year()))
   })
 
-  # Redraw only the point layer when the year slider changes
+  # Redraw the point layers whenever the year changes. clearGroup() makes this
+  # idempotent, so the first run (harmlessly re-drawing what renderLeaflet already
+  # painted, or correcting it once the real slider value arrives) is fine.
   observe({
-    yr <- input$year
-    d  <- prob_data |> filter(year == yr, prob > 0)
-
-    leafletProxy("map") |>
-      # Redraw grey background with year-specific popup
-      clearGroup("background") |>
-      addCircleMarkers(
-        data        = all_points,
-        lng         = ~lon,
-        lat         = ~lat,
-        radius      = 3,
-        fillColor   = "#aaaaaa",
-        fillOpacity = 0.4,
-        stroke      = FALSE,
-        group       = "background",
-        popup       = paste0(
-          "<b>Waterpoint</b><br>",
-          "Probability colonised by <b>", yr, "</b>: <b>0%</b>"
-        )
-      ) |>
-      clearGroup("points") |>
-      addCircleMarkers(
-        data        = d,
-        lng         = ~lon,
-        lat         = ~lat,
-        radius      = 4,
-        fillColor   = ~pal(prob),
-        fillOpacity = 0.85,
-        stroke      = FALSE,
-        group       = "points",
-        popup       = ~paste0(
-          "<b>Waterpoint</b><br>",
-          "Probability colonised by <b>", yr, "</b>: ",
-          "<b>", round(prob * 100), "%</b><br>",
-          ifelse(mean_arrival <= start_year,
-                 paste0("Colonised since: <b>", mean_arrival, "</b>"),
-                 paste0("Median expected arrival year: <b>", mean_arrival, "</b>"))
-        )
-      )
+    draw_points(leafletProxy("map"), current_year())
   })
 }
 

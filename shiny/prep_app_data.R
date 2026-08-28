@@ -4,11 +4,18 @@
 # for the interactive Shiny app.
 #
 # Requires:
-#   - out/forecast.RData  (produced by save_outputs())
-#   - tcz.boundary        (sf object in session, loaded via src/load-data.R)
+#   - out/forecast.RData         (produced by save_outputs())
+#   - tcz.boundary               (sf; in session from src/tcz-sims/load-data.R, else
+#                                 read from DATA_PATH below)
+#   - pastoral.boundaries        (sf; in session from load-data.R, else read from
+#                                 out/pastoral-boundaries.shp which load-data.R writes)
 #
 # Output:
 #   - shiny/data/app_data.rds
+#
+# It is sourced at the end of src/tcz-sims/forecast.R (boundaries already in session).
+# It can also be run standalone (e.g. to rebuild the shinylive site without re-running
+# the forecast) as long as out/forecast.RData and out/pastoral-boundaries.shp exist.
 
 library(dplyr)
 library(sf)
@@ -18,6 +25,19 @@ start.year <- 2025
 cat("Loading simulation output...\n")
 load("out/forecast.RData")
 cat("Processing", length(output), "simulation replicates.\n")
+
+# ---- Boundaries: reuse session objects if present, otherwise load from disk ----
+if (!exists("tcz.boundary")) {
+  spatial.dir <- file.path(Sys.getenv("DATA_PATH"), "GIS - General",
+                           "GIS_layers_read_only/")
+  tcz.boundary <- st_read(
+    file.path(spatial.dir, "TCZ_boundary/Toad_Containment_Zone_Boundary_July 26.shp"),
+    quiet = TRUE
+  )
+}
+if (!exists("pastoral.boundaries")) {
+  pastoral.boundaries <- st_read("out/pastoral-boundaries.shp", quiet = TRUE)
+}
 
 # ---- Extract per-simulation arrival years ----
 # Uses first.col.gen (generation a point was first colonised, relative to start.year) rather

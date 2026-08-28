@@ -25,7 +25,7 @@ Both of these `source("src/tcz-sims/load-data.R")` internally, which pulls in ra
 
 For the HPC (cluster) workflow, `src/cluster/a-setup-environment.sh` loads the required environment modules (`r/4.3.0`, `gdal`, `geos`, `proj`, `udunits`) before invoking scripts with `commandArgs`.
 
-The Shiny app (`shiny/app.R`) is a separate deployable unit: run `shiny/prep_app_data.R` after a `forecast.R` run to regenerate `shiny/data/app_data.rds`, then launch the app from the `shiny/` directory (it has its own `.Rproj`).
+The Shiny app (`shiny/app.R`) is a separate deployable unit: run `shiny/prep_app_data.R` after a `forecast.R` run to regenerate `shiny/data/app_data.rds`, then launch the app from the `shiny/` directory (it has its own `.Rproj`). The app is deliberately thin — it `readRDS()`s `app_data.rds` once and only filters/redraws Leaflet markers by year; all spatial work (`sf`, Albers reprojection, per-year colonisation probabilities) happens up-front in `prep_app_data.R`. That means it can be shipped as a **static shinylive site** (`Rscript shiny/build_site.R` → `shiny/site/`, gitignored) that runs entirely in the browser via webR and needs no Shiny Server — the preferred way to host it for public / high-traffic use. `prep_app_data.R` runs both inside a `forecast.R` session (boundary sf objects already in scope) and standalone (it then reads `tcz.boundary` from `DATA_PATH` and `pastoral.boundaries` from `out/pastoral-boundaries.shp`). `build_site.R`'s first run downloads ~400 MB of shinylive web assets into a user cache.
 
 Manuscript output (`ms/tcz-optimisation-methods.qmd`) renders via Quarto (`_quarto.yml` sets `output-dir: ms/output`); it references figures written to `out/` by the simulation scripts, so simulations must be run before rendering.
 

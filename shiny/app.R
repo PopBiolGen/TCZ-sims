@@ -113,7 +113,7 @@ ui <- page_navbar(
 
       h4("Waterpoints are the key"),
       p(
-        "Cane toads cannot survive thoe northern dry season without water. In seasonally arid",
+        "Cane toads cannot survive the northern dry season without water. In seasonally arid",
         "landscapes like the southern Kimberley and Pilbara, water is found at discrete",
         "points — bores, tanks, dams, springs, and rock holes — scattered",
         "across an otherwise dry landscape. The model treats these waterpoints",

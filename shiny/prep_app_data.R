@@ -20,7 +20,7 @@
 library(dplyr)
 library(sf)
 
-start.year <- 2025
+start.year <- start_year
 
 cat("Loading simulation output...\n")
 load("out/forecast.RData")
@@ -95,9 +95,17 @@ prob_data <- prob_data |>
   left_join(mean_arrival, by = "ID") |>
   select(ID, lon, lat, year, prob, mean_arrival)
 
-# ---- All waterpoints for background display (including never-colonised) ----
+# ---- Waterpoints for background display ----
+# Only points colonised in at least one replicate (i.e. present in all_arrivals).
+# Points that are never colonised -- everything south of the fastest replicate's
+# front, which stops at the first TCZ breach -- carry no information but, under
+# shinylive/webR, each is a live browser marker. Dropping them cuts the app's
+# memory and render cost. prob_data is already colonised-only (built above from
+# all_arrivals), so all_points is the last place these points survive.
+n_all_points <- nrow(as.data.frame(output[[1]]$popmatrix))
 all_points <- as.data.frame(output[[1]]$popmatrix) |>
   select(ID, X, Y) |>
+  filter(ID %in% unique(all_arrivals$ID)) |>
   st_as_sf(coords = c("X", "Y"), crs = 3577) |>
   st_transform(4326) |>
   mutate(
@@ -110,8 +118,20 @@ all_points <- as.data.frame(output[[1]]$popmatrix) |>
 # ---- TCZ boundary in WGS84 ----
 tcz_wgs84 <- st_transform(tcz.boundary, 4326)
 
-# ---- Pastoral boundaries in WGS84 ----
+# ---- Pastoral boundaries in WGS84, trimmed to the TCZ latitude and north ----
+# Pastoral polygons lying entirely south of the TCZ are off-screen context that
+# only adds vertices (memory + SVG paths under webR). Keep any polygon that reaches
+# the TCZ's southern edge or further north; drop the rest.
 pastoral_wgs84 <- st_transform(pastoral.boundaries, 4326)
+n_pastoral_all <- nrow(pastoral_wgs84)
+pastoral_bbox <- st_bbox(pastoral_wgs84)
+pastoral_keep_box <- st_as_sfc(st_bbox(c(
+  xmin = unname(pastoral_bbox["xmin"]) - 1,
+  xmax = unname(pastoral_bbox["xmax"]) + 1,
+  ymin = unname(st_bbox(tcz_wgs84)["ymin"]) - 0.1,
+  ymax = unname(pastoral_bbox["ymax"]) + 1
+), crs = 4326))
+pastoral_wgs84 <- st_filter(pastoral_wgs84, pastoral_keep_box, .predicate = st_intersects)
 
 # ---- Initial map extent: span from TCZ boundary to colonised waterpoints ----
 # Using colonised waterpoints rather than inv.front, which can have geometry
@@ -151,7 +171,11 @@ saveRDS(
 
 cat(
   "Saved shiny/data/app_data.rds\n",
-  " Points :", n_distinct(prob_data$ID), "\n",
-  " Years  :", length(years), "\n",
-  " Rows   :", nrow(prob_data), "\n"
+  " Points         :", n_distinct(prob_data$ID), "\n",
+  " Background pts  :", nrow(all_points), "of", n_all_points,
+  "(dropped", n_all_points - nrow(all_points), "never-colonised)\n",
+  " Pastoral polys  :", nrow(pastoral_wgs84), "of", n_pastoral_all,
+  "(dropped", n_pastoral_all - nrow(pastoral_wgs84), "south of TCZ)\n",
+  " Years          :", length(years), "\n",
+  " Rows           :", nrow(prob_data), "\n"
 )

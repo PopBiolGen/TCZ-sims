@@ -10,6 +10,7 @@ all.points <- all.points |>
 ######## load simulation posteriors ########
 load("dat/Posteriors_2026.RData")
 
+start_year <- 2026
 
 ######## tcz-arrival scenario ########
 scen.name <- "forecast"
@@ -24,7 +25,7 @@ setup(point.data = all.points,
       trunc.dist = TRUE,
       TCZ = FALSE,
       col.year.id = "colonisation_year",
-      start.year = 2025)
+      start.year = start_year)
 # write out points for basemapping
 write.csv(spread.table, file = "out/basemap_points.csv", row.names = FALSE)
 # run sims..
@@ -32,7 +33,7 @@ sim_out <- run_sims(n.sims = 100, gens = 20, plot = FALSE, rollup = FALSE)
 save_outputs(output = sim_out,
              path = "out",
              scenario.name = scen.name,
-             start.year=2025,
+             start.year=start_year,
              plot.time = TRUE,
              extinction.aware = TRUE)
 make_plots(scen.name, plot.year = TRUE, tcz.boundary = tcz.boundary)

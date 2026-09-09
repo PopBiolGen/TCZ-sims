@@ -28,14 +28,20 @@ stopifnot(
 
 # Export from a clean staging copy so shiny/ helper scripts (this file,
 # prep_app_data.R, rsconnect/, the .Rproj) don't get bundled into the app.
-staging <- tempfile("tcz-shinylive-")
-dir.create(file.path(staging, "data"), recursive = TRUE)
-file.copy(app_r, file.path(staging, "app.R"))
-file.copy(app_data, file.path(staging, "data", "app_data.rds"))
-on.exit(unlink(staging, recursive = TRUE), add = TRUE)
+# Wrapped in a function so on.exit() cleanup is tied to a real call frame --
+# at a script's top level on.exit() fires immediately under source() (deleting
+# the staging dir before export() sees it) and is ignored under Rscript.
+export_site <- function() {
+  staging <- tempfile("tcz-shinylive-")
+  on.exit(unlink(staging, recursive = TRUE), add = TRUE)
+  dir.create(file.path(staging, "data"), recursive = TRUE)
+  file.copy(app_r, file.path(staging, "app.R"))
+  file.copy(app_data, file.path(staging, "data", "app_data.rds"))
 
-unlink(out_dir, recursive = TRUE)
-shinylive::export(staging, out_dir)
+  unlink(out_dir, recursive = TRUE)
+  shinylive::export(staging, out_dir)
+}
+export_site()
 
 cat(
   "\nExported to ", out_dir, "\n",

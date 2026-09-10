@@ -100,7 +100,7 @@ all.points <- st_read(file.path(spatial.dir, "Edited-layers/merged-points.shp"))
   select(fcsubtype_, full_name, perennia_1, origin_des, watercou_1, area_m, st_perimet) |> 
   st_transform(crs = 4326) |>
   bind_rows(d_extra) |> # add additional points from aerial imagery
-  bind_rows(df |> select(full_name = location_n, geometry)) |>  # add additional points from on-ground surveys
+  bind_rows(df |> select(full_name = display_label, geometry)) |>  # add additional points from on-ground surveys
   st_transform(crs = 3577) |>
   st_filter(survey.point.bbox, .predicate = st_within)
   
